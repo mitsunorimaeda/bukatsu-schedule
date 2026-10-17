@@ -2,6 +2,7 @@
  * 画面側のモデル（docs/ux-redesign.md）。
  *  ワークスペース（学校） > カレンダー（DB では layer） > 班（slots） > 予定
  */
+import { KIND_LABEL } from '@bukatsu/core/browser';
 import type { Kind, LayerType, SchoolSettings } from '@bukatsu/core/browser';
 
 export type { Kind };
@@ -175,19 +176,63 @@ export function publicEvents(c: Calendar): UiEvent[] {
   return c.published;
 }
 
-const SIG = (e: UiEvent) => JSON.stringify([e.title, e.timeStart, e.timeEnd, e.date, e.endDate, e.place, e.kind, [...e.slots].sort(), e.note]);
+/** 内容の署名（1 日・1 班ぶん）。保存のされ方（班ごとの別行か、班をまたぐ 1 件か / 期間の畳み方）に依らず比べる */
+const MARKER_NOTE = /元の表で強調表示/g;
+const noteOf = (e: UiEvent) => (e.note ?? '').replace(MARKER_NOTE, '').replace(/^[\s・、,]+|[\s・、,]+$/g, '');
+const SIG = (e: UiEvent) => JSON.stringify([e.title, e.timeStart ?? '', e.timeEnd ?? '', e.place ?? '', e.kind, noteOf(e)]);
 
-/** 公開中との差分（手動公開の「未公開の変更」）。uid で突き合わせる */
+/**
+ * 公開中との差分（確認待ちの取り込み、手動公開の「未公開の変更」）。
+ * uid ではなく、(班, 日) のマスごとに内容で突き合わせる。同じマスに内容の違う 1 件ずつがあれば「変更」、片方だけなら「追加」「取消」。
+ * 同じ予定（班をまたぐ 1 件・期間の予定）が複数マスで同じ判定になった場合は 1 件にまとめる。
+ */
 export function diffEvents(before: UiEvent[], after: UiEvent[]): Change[] {
-  const b = new Map(before.map((e) => [e.uid, e]));
-  const a = new Map(after.filter((e) => !e.draft).map((e) => [e.uid, e]));
-  const out: Change[] = [];
-  for (const [uid, e] of a) {
-    const p = b.get(uid);
-    if (!p) out.push({ type: 'added', after: e });
-    else if (SIG(p) !== SIG(e)) out.push({ type: 'changed', before: p, after: e });
+  type Item = { e: UiEvent; sig: string };
+  const cells = new Map<string, { b: Item[]; a: Item[] }>();
+  const put = (side: 'b' | 'a', e: UiEvent) => {
+    const sig = SIG(e);
+    for (const slot of e.slots) {
+      for (const d of datesBetween(e.date, e.endDate ?? e.date, 400)) {
+        const k = `${slot}|${d}`;
+        const c = cells.get(k) ?? cells.set(k, { b: [], a: [] }).get(k)!;
+        c[side].push({ e, sig });
+      }
+    }
+  };
+  for (const e of before) put('b', e);
+  for (const e of after) if (!e.draft) put('a', e);
+
+  const byKey = new Map<string, Change>();
+  const add = (key: string, ch: Change) => {
+    if (!byKey.has(key)) byKey.set(key, ch);
+  };
+  for (const { b, a } of cells.values()) {
+    // 同じ内容は相殺
+    const restB = [...b];
+    const restA: Item[] = [];
+    for (const x of a) {
+      const i = restB.findIndex((y) => y.sig === x.sig);
+      if (i >= 0) restB.splice(i, 1);
+      else restA.push(x);
+    }
+    // 残り: 同じマスの 1 対 1 は「変更」、余りは「追加」「取消」
+    while (restA.length && restB.length) {
+      const x = restA.shift()!;
+      const y = restB.shift()!;
+      // 同じ予定（班をまたぐ 1 件）は 1 行にまとめる
+      add(`c|${x.e.uid}`, { type: 'changed', before: y.e, after: x.e });
+    }
+    for (const x of restA) add(`a|${x.e.uid}`, { type: 'added', after: x.e });
+    for (const y of restB) add(`r|${y.e.uid}`, { type: 'removed', before: y.e });
   }
-  for (const [uid, p] of b) if (!a.has(uid)) out.push({ type: 'removed', before: p });
+  // 同じ予定が「変更」として拾われていれば、同じ予定の「追加」「取消」は出さない
+  const changedAfter = new Set<string>();
+  const changedBefore = new Set<string>();
+  for (const ch of byKey.values()) if (ch.type === 'changed') {
+    changedAfter.add(ch.after!.uid);
+    changedBefore.add(ch.before!.uid);
+  }
+  const out = [...byKey.values()].filter((ch) => !(ch.type === 'added' && changedAfter.has(ch.after!.uid)) && !(ch.type === 'removed' && changedBefore.has(ch.before!.uid)));
   return out.sort((x, y) => (x.after ?? x.before)!.date.localeCompare((y.after ?? y.before)!.date));
 }
 
@@ -209,7 +254,16 @@ export function changeLine(x: Change): string {
   const slot = e.slots.length > 1 ? e.slots.join('・') : e.slots[0];
   if (x.type === 'added') return `${md(e.date)} ${slot}: 追加 ${e.title}`;
   if (x.type === 'removed') return `${md(e.date)} ${slot}: 取消 ${e.title}`;
-  return `${md(e.date)} ${slot}: ${fmtTime(x.before!)} ${x.before!.title} → ${fmtTime(x.after!)} ${x.after!.title}`;
+  const b = x.before!;
+  const a = x.after!;
+  const main = `${md(e.date)} ${slot}: ${fmtTime(b)} ${b.title} → ${fmtTime(a)} ${a.title}`;
+  // 件名と時刻が同じなら、何が変わったかを添える
+  const extra: string[] = [];
+  if ((b.place ?? '') !== (a.place ?? '')) extra.push(`場所: ${b.place || 'なし'} → ${a.place || 'なし'}`);
+  if (noteOf(b) !== noteOf(a)) extra.push(`備考: ${noteOf(b) || 'なし'} → ${noteOf(a) || 'なし'}`);
+  if (b.kind !== a.kind) extra.push(`種類: ${KIND_LABEL[b.kind]} → ${KIND_LABEL[a.kind]}`);
+  if ((b.endDate ?? '') !== (a.endDate ?? '')) extra.push(`終了日: ${b.endDate ? md(b.endDate) : 'なし'} → ${a.endDate ? md(a.endDate) : 'なし'}`);
+  return extra.length && b.title === a.title && fmtTime(b) === fmtTime(a) ? `${md(e.date)} ${slot}: ${a.title}（${extra.join('、')}）` : main;
 }
 
 /** 新しい予定の uid。(calendar, 先頭の班, 日, 種類) + ランダムで、同日同種が複数あっても衝突しない */
