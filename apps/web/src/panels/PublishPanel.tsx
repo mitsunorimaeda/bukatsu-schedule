@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { publishCalendar, setVersionStatus } from '../api';
+import { publishCalendar, approveVersion, setVersionStatus } from '../api';
 import { changeLine, draftCount, unpublishedChanges, type Calendar, type Change, type Workspace } from '../model';
 import { Panel, copyText, useToast } from '../ui';
 
@@ -56,6 +56,9 @@ export function ApprovePanel({ cal, onClose, onDone }: { cal: Calendar; onClose:
       <p className="hint">
         読み取った {p.events.length} 件。公開中の内容との違いは {p.changes.length} 件（月間表でも色で出ています）。
       </p>
+      <p className="hint">
+        反映すると <b>{p.months.map((m) => `${Number(m.slice(5))}月`).join('・')}</b> の内容がこの版に入れ替わります。他の月の公開内容はそのまま残ります。
+      </p>
       <ChangeList changes={p.changes} />
       {err && <div className="error">{err}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -65,7 +68,7 @@ export function ApprovePanel({ cal, onClose, onDone }: { cal: Calendar; onClose:
           onClick={async () => {
             setBusy(true);
             try {
-              await setVersionStatus(p.version.id, 'approved');
+              await approveVersion(p.version.id);
               await onDone();
               toast('反映しました。リンク・ICS・PDF にも反映されます');
               onClose();

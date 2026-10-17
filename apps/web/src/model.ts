@@ -54,7 +54,8 @@ export interface Calendar {
   /** 公開中の内容（下書き除く） */
   published: UiEvent[];
   /** 確認待ちの取り込み（あれば） */
-  pending?: { version: Version; events: UiEvent[]; changes: Change[] };
+  /** 確認待ちの取り込み（あれば）。months = 入れ替わる月（他の月はそのまま残る） */
+  pending?: { version: Version; events: UiEvent[]; changes: Change[]; months: string[] };
   /** 1 つ前の公開版（差分の基準） */
   previous?: { version: Version; events: UiEvent[] };
 }

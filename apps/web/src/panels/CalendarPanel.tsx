@@ -4,11 +4,11 @@ import { remapSlots, saveCalendar, deleteCalendar, type CalendarInput } from '..
 import type { Calendar, Workspace } from '../model';
 import { Panel, useToast } from '../ui';
 
-const SOURCES: { kind: string; title: string; desc: string }[] = [
+const SOURCES: { kind: string; title: string; desc: string; soon?: boolean }[] = [
   { kind: 'manual', title: 'この画面で直接書く', desc: '表のマスをクリックして入力。Excel と同じ感覚' },
-  { kind: 'pdf', title: 'いつもの PDF・写真を読ませる', desc: 'Excel で作った PDF、紙の写真でも可。AI が表に起こし、確認してから反映' },
-  { kind: 'sheet', title: 'Google シート / CSV をつなぐ', desc: 'URL を登録すると 1 時間ごとに自動で取り込み' },
-  { kind: 'template', title: '入力用のシートをもらう', desc: '日付 × 班のテンプレを配布。シートの「反映」ボタンで送信' },
+  { kind: 'pdf', title: 'いつもの PDF・写真を読ませる', desc: 'Excel で作った PDF、紙の写真でも可。AI が表に起こし、確認してから反映。鍵がなくても ChatGPT などの画面経由で可' },
+  { kind: 'sheet', title: 'Google シート / CSV をつなぐ（準備中）', desc: '今は設定ファイルと CLI で取り込めます（docs/self-hosting.md）。画面からの登録は準備中', soon: true },
+  { kind: 'template', title: '入力用のシートをもらう（準備中）', desc: '日付 × 班のテンプレを配布し、シートから送信する形を準備中', soon: true },
 ];
 
 /** 追加と設定を 1 つのパネルで。existing があれば設定モード */
@@ -184,8 +184,8 @@ export function CalendarPanel({
             <div className="hint">予定の入れ方</div>
             <div className="choices">
               {SOURCES.map((s) => (
-                <label key={s.kind} className={`choice${kind === s.kind ? ' on' : ''}`}>
-                  <input type="radio" name="src" value={s.kind} checked={kind === s.kind} onChange={() => setKind(s.kind)} />
+                <label key={s.kind} className={`choice${kind === s.kind ? ' on' : ''}${s.soon ? ' soon' : ''}`}>
+                  <input type="radio" name="src" value={s.kind} checked={kind === s.kind} disabled={s.soon} onChange={() => setKind(s.kind)} />
                   <span>
                     <b>{s.title}</b>
                     <small>{s.desc}</small>

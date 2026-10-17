@@ -219,7 +219,12 @@ export async function loadWorkspace(id: string): Promise<Workspace> {
       events: working,
       published,
     };
-    if (p.pending) c.pending = { version: toVersion(p.pending), events: evs(p.pending), changes: diffEvents(published, evs(p.pending)) };
+    if (p.pending) {
+      // 反映は「確認待ちに含まれる月だけ入れ替え」なので、違いもその月の中で見る
+      const pe = evs(p.pending);
+      const months = [...new Set(pe.map((e) => e.date.slice(0, 7)))].sort();
+      c.pending = { version: toVersion(p.pending), events: pe, changes: diffEvents(published.filter((e) => months.includes(e.date.slice(0, 7))), pe), months };
+    }
     if (p.previous) c.previous = { version: toVersion(p.previous), events: evs(p.previous) };
     return c;
   });
@@ -329,6 +334,11 @@ export async function publishCalendar(schoolId: string, cal: Calendar): Promise<
   const { error } = await must().rpc('publish_layer', { p_school: schoolId, p_layer: cal.id });
   if (error) fail('公開できませんでした', error);
 }
+/** 確認待ちの取り込みを反映する。含まれる月だけ入れ替え、他の月の公開内容は残る（RPC approve_version） */
+export async function approveVersion(versionId: string): Promise<void> {
+  const { error } = await must().rpc('approve_version', { p_version: versionId });
+  if (error) fail('反映できませんでした', error);
+}
 export async function setVersionStatus(versionId: string, status: 'approved' | 'rejected'): Promise<void> {
   const sb = must();
   const uid = (await sb.auth.getUser()).data.user?.id ?? null;
@@ -409,17 +419,19 @@ export interface Member {
 }
 export async function listMembers(schoolId: string): Promise<Member[]> {
   const sb = must();
-  const [{ data: ms }, { data: inv }, { data: gs }] = await Promise.all([
+  const [{ data: ms }, { data: inv }, { data: gs }, { data: emails }] = await Promise.all([
     sb.from('memberships').select('user_id, role').eq('school_id', schoolId),
     sb.from('invites').select('email, role, grants, accepted_at').eq('school_id', schoolId).order('created_at', { ascending: false }),
     sb.from('layer_grants').select('user_id, layer_id, categories').eq('school_id', schoolId),
+    sb.rpc('member_emails', { p_school: schoolId }),
   ]);
+  const emailOf = new Map(((emails ?? []) as { user_id: string; email: string }[]).map((r) => [r.user_id, r.email]));
   const grantsByUser = new Map<string, Record<string, string[] | null>>();
   for (const g of (gs ?? []) as { user_id: string; layer_id: string; categories: string[] | null }[]) (grantsByUser.get(g.user_id) ?? grantsByUser.set(g.user_id, {}).get(g.user_id)!)[g.layer_id] = g.categories;
   const invitesByEmail = (inv ?? []) as { email: string; role: Member['role']; grants: Record<string, string[] | null> | null; accepted_at: string | null }[];
   const out: Member[] = ((ms ?? []) as { user_id: string; role: Member['role'] }[]).map((m) => ({
     user_id: m.user_id,
-    email: invitesByEmail.find((i) => i.accepted_at)?.email ?? '（メール非表示）',
+    email: emailOf.get(m.user_id) ?? '（メール非表示）',
     role: m.role,
     grants: grantsByUser.get(m.user_id),
   }));

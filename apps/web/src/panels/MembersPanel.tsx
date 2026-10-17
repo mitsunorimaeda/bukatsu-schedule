@@ -88,7 +88,7 @@ export function MembersPanel({ ws, onClose }: { ws: Workspace; onClose: () => vo
         <button className="primary" onClick={invite} disabled={busy || !email.trim() || ws.role !== 'admin'}>
           招待する
         </button>
-        <p className="hint">招待した人は、このアプリにそのメールでログインすると自動で参加します（Bekuta のアカウントがあればそれでも入れます）。</p>
+        <p className="hint">招待した人は、このアプリにそのメールでログインすると自動で参加します。</p>
       </div>
       <h3 style={{ fontSize: 13, marginTop: 14 }}>いるメンバー</h3>
       <ul className="members" style={{ listStyle: 'none', padding: 0, margin: 0 }}>

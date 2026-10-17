@@ -213,3 +213,4 @@ table.plain th{color:var(--muted);font-weight:500;font-size:12px}
 .howto-steps .acts{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px}
 .howto-steps textarea{display:block;margin-top:6px}
 .howto-steps textarea{width:100%;font:12px/1.4 ui-monospace,Menlo,monospace;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
+.choice.soon{opacity:.6;cursor:not-allowed}
