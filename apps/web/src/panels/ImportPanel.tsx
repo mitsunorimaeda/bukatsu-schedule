@@ -245,7 +245,7 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
               </button>
             </>
           )}
-          <p className="hint">Google シート / CSV の自動取り込みは設定ファイルで行います（画面からの登録は次の段階）。</p>
+          <p className="hint">Google シート / CSV は、カレンダーの設定（⚙）で「Google シート / CSV をつなぐ」を選ぶと URL を登録して取り込めます。</p>
         </div>
       )}
       {step === 2 && (

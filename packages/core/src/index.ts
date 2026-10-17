@@ -8,3 +8,4 @@ export * from './convert.js';
 export * from './ai/reader.js';
 export * from './ai/prompts.js';
 export * from './ai/manual.js';
+export * from './sheet.js';

@@ -9,3 +9,4 @@ export * from './convert.js';
 export * from './ai/prompts.js';
 export { strictSchema } from './ai/schema.js';
 export * from './ai/manual.js';
+export * from './sheet.js';

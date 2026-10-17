@@ -474,3 +474,14 @@ export async function createPendingVersion(schoolId: string, cal: Calendar, labe
   const unknownSlots = [...new Set(events.map((e) => e.category))].filter((c) => !cal.slots.includes(c));
   return { versionId, count: events.length, unknownSlots };
 }
+
+// ---------- Google シート / CSV ----------
+/** サーバー経由で CSV を取ってくる（calendarId 無し = 作成前の確認。管理者だけ） */
+export async function fetchSheetCsv(schoolId: string, calendarId: string | undefined, url: string): Promise<string> {
+  const session = (await must().auth.getSession()).data.session;
+  if (!session) throw new Error('ログインが切れています');
+  const res = await fetch('/api/sheet', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolId, calendarId, url }) });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; csv?: string };
+  if (!res.ok || body.error || body.csv == null) throw new Error(body.error ?? `HTTP ${res.status}`);
+  return body.csv;
+}
