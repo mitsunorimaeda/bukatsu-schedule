@@ -1,5 +1,5 @@
 -- bukatsu-schedule 初期スキーマ（docs/plan.md 3 章）
--- すべて専用スキーマ bukatsu に置く。public など他のスキーマには触れない（ACWR 改 に居候するため）。
+-- すべて専用スキーマ bukatsu に置く。public など他のスキーマには触れない（既存の Supabase プロジェクトに同居できるように）。
 -- 依存: 拡張なし（gen_random_uuid と sha256 は PostgreSQL 本体の関数）。auth.users は参照のみ。
 
 create schema if not exists bukatsu;

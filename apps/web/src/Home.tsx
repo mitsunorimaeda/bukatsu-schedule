@@ -172,7 +172,7 @@ export function LoginScreen() {
       </header>
       <div className="home" style={{ maxWidth: 440 }}>
         <h1>ログイン</h1>
-        <p className="lead">先生・顧問・ARCA 向け。Bekuta と同じアカウントが使えます。閲覧だけなら共有リンクで足ります。</p>
+        <p className="lead">先生・顧問・保護者向け。メールアドレスだけで入れます。閲覧だけなら共有リンクで足ります。</p>
         <form
           className="form"
           onSubmit={(e) => {

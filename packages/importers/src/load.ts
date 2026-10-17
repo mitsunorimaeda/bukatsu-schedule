@@ -57,7 +57,7 @@ function fromRow(r: Record<string, unknown>): ScheduleEvent {
 }
 
 async function main() {
-  // --target cloud で ACWR 改（SUPABASE_CLOUD_*）、既定はローカル（SUPABASE_*）
+  // --target cloud で本番の Supabase（SUPABASE_CLOUD_*）、既定はローカル（SUPABASE_*）
   const target = arg('target', 'local');
   const url = target === 'cloud' ? process.env.SUPABASE_CLOUD_URL : process.env.SUPABASE_URL;
   const key = target === 'cloud' ? process.env.SUPABASE_CLOUD_SERVICE_ROLE_KEY : process.env.SUPABASE_SERVICE_ROLE_KEY;

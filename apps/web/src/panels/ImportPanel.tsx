@@ -217,12 +217,14 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
             <>
               <ol className="howto-steps">
                 <li>
-                  <button className={copied ? '' : 'primary'} onClick={copyPrompt} disabled={!cal}>
-                    {copied ? '✓ 指示文をコピーしました（もう一度コピー）' : '1. 指示文をコピー'}
-                  </button>
-                  <button className="ghost" onClick={() => setShowPrompt((v) => !v)}>
-                    {showPrompt ? '指示文を隠す' : '指示文を見る'}
-                  </button>
+                  <div className="acts">
+                    <button className={copied ? '' : 'primary'} onClick={copyPrompt} disabled={!cal}>
+                      {copied ? '✓ 指示文をコピーしました（もう一度コピー）' : '1. 指示文をコピー'}
+                    </button>
+                    <button className="ghost" onClick={() => setShowPrompt((v) => !v)}>
+                      {showPrompt ? '指示文を隠す' : '指示文を見る'}
+                    </button>
+                  </div>
                   {showPrompt && <textarea readOnly value={prompt} rows={8} onFocus={(e) => e.currentTarget.select()} />}
                 </li>
                 <li>

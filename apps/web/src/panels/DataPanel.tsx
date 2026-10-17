@@ -53,6 +53,7 @@ export function DataPanel({ ws, onClose, onLeft }: { ws?: Workspace; onClose: ()
         <h4>AI に送るもの</h4>
         <ul>
           <li>「PDF・シートを取り込む」で PDF や画像を読ませたときだけ、そのファイルの内容を Anthropic の Claude API に送ります。送るのは読み取りのためで、API に送ったデータはモデルの学習には使われません（Anthropic の商用 API の規約）。</li>
+          <li>「自分の AI に読ませて貼り付ける」を選んだときは、PDF はこのアプリではなく、あなたが選んだ AI サービス（OpenAI・Google・Anthropic など）に、そのサービスの規約のもとで送られます。無料プランは入力を学習に使う設定が既定の場合があるので、設定を確認するか学校・職場のアカウントを使ってください。このアプリには貼り付けた結果だけが届きます。</li>
           <li>手で入力した予定、Google シート・CSV から読んだ予定、閲覧・共有の操作では AI には何も送りません。</li>
         </ul>
 
