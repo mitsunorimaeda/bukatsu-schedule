@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+dist/
+.DS_Store
+supabase/.temp/
+supabase/.branches/
+out/
+apps/web/public/data/
+apps/web/public/mock/
+fixtures/
+out_mock/

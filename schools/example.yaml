@@ -1,0 +1,72 @@
+# 学校ワークスペースの設定（CLI 取り込み用の例）。画面から作る場合はこのファイルは不要。
+# 使い方: このファイルを複製して schools/<id>.yaml にし、npm run import -- --school schools/<id>.yaml --out out
+id: example
+name: 〇〇高校
+settings:
+  afterSchoolStart: "15:30"   # 「業後」「放課後」の開始時刻
+  defaultDurationMin: 120     # 終了時刻が書かれていない練習の長さ
+  fiscalYearStartMonth: 4
+
+layers:
+  # 学校の年間行事予定（PDF を AI で読む。ANTHROPIC_API_KEY が無ければ画面の「自分の AI に読ませて貼り付ける」を使う）
+  - id: school
+    type: school
+    name: 学校予定
+    color: "#6b7280"
+    slots: [生徒, 学校・その他]
+    publishMode: manual
+    source:
+      kind: pdf
+      prompt: school-calendar
+      path: fixtures/school/annual_calendar.pdf   # fixtures/ は Git 管理外。実物をここに置く
+      pages: [[1, 4]]
+      variables:
+        fiscalYear: "2026"
+
+  # 部活の月間予定表（日 × 班 の表を PDF で配っている部）
+  - id: club:soccer
+    type: club
+    name: サッカー部
+    color: "#dc2626"
+    slots: [トップ, セカンド, ルーキー, 朝練]
+    publishMode: manual
+    source:
+      kind: pdf
+      prompt: club-table
+      path: fixtures/soccer/2026-10.pdf
+
+  # Google スプレッドシートを xlsx に落としたもの（日付・曜日・時刻・内容の 4 列だけ読む。選手名の列は読まない）
+  - id: club:track
+    type: club
+    name: 陸上部
+    color: "#2563eb"
+    slots: [全体]
+    publishMode: auto
+    source:
+      kind: xlsx
+      path: fixtures/track/plan.xlsx
+      sheet: "2026"
+      columns: { date: A, weekday: B, time: C, event: D }
+      timeDefaults:
+        "業後": { start: "15:30" }
+
+  # 公開 CSV（Google シートの「ウェブに公開」など）
+  - id: external:fencing
+    type: external
+    name: フェンシング協会
+    color: "#16a34a"
+    slots: [全体]
+    publishMode: auto
+    source:
+      kind: csv
+      path: fixtures/fencing/export.csv
+      ignoreColumns: [別スケジュール]   # 生徒名が入る列は物理的に落とす
+
+  # 先生が画面で直接入れるカレンダー
+  - id: manual:teacher
+    type: manual
+    name: 先生の手入力
+    color: "#7c3aed"
+    slots: [全体]
+    publishMode: auto
+    source: { kind: manual }

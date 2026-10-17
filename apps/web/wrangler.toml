@@ -1,0 +1,4 @@
+# Cloudflare Pages の設定。画面（dist）と受け口（functions/）を同じプロジェクトに置く
+name = "bukatsu-schedule"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-06-01"

@@ -1,0 +1,23 @@
+{
+  "name": "bukatsu-schedule",
+  "private": true,
+  "version": "0.1.0",
+  "description": "学校の予定・部活の予定・外部予定を一括で確認できる予定表作成ツール",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "tsc -b packages/core packages/importers",
+    "import": "tsx packages/importers/src/cli.ts",
+    "web:data": "mkdir -p apps/web/public/data && cp out/meiden/bundle.json apps/web/public/data/meiden.json",
+    "web:dev": "npm run dev -w apps/web",
+    "load": "tsx packages/importers/src/load.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
