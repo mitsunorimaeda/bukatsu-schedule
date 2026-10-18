@@ -28,6 +28,31 @@ export interface SheetSource {
   /** 実際に取りに行く CSV の URL */
   csvUrl: string;
   mapping: SheetMapping;
+  /** 1 時間ごとの自動更新で変化があったとき: そのまま反映 / 確認待ちにする / 何もしない（既定 apply） */
+  auto?: 'apply' | 'pending' | 'off';
+  /** 自動更新の記録（サーバーが書く） */
+  lastSync?: string;
+  lastHash?: string;
+  lastCount?: number;
+  lastError?: string | null;
+  lastChange?: string;
+}
+
+/** 取り込み結果の指紋。同じなら版を増やさない */
+export function eventsHash(events: ScheduleEventInput[]): string {
+  const sig = events
+    .map((e) => [e.date, e.endDate ?? '', e.category, (e.slots ?? []).join('・'), e.kind, e.timeStart ?? '', e.timeEnd ?? '', e.place ?? '', e.title, e.note ?? ''].join('|'))
+    .sort()
+    .join('\n');
+  // FNV-1a 32bit × 2（Node 非依存で十分短い）
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < sig.length; i++) {
+    const c = sig.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x811c9dc5) >>> 0;
+  }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
 }
 
 /** RFC 4180 風の CSV。引用符・改行入りセル・CRLF・BOM に対応 */

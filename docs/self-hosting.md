@@ -37,6 +37,18 @@ Pages の Settings → Variables and Secrets に、Production 向けの secret �
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role キー（取り込み結果の保存に使う） | 必須 |
 | `ANTHROPIC_API_KEY` | Claude API の鍵 | 任意。無ければ「自分の AI に読ませる」経路だけ |
 
+## 2b. シートの自動更新（任意）
+
+Google シート / CSV をつないだカレンダーを 1 時間ごとに見に行く仕組みは、Pages の `/api/sync` を外から叩く形です。
+
+1. 合言葉を決めて（例: `openssl rand -hex 24`）、Pages の secret `SYNC_KEY` に置く（再デプロイ）。
+2. 1 時間ごとに `POST https://<あなたの Pages>/api/sync` を `Authorization: Bearer <SYNC_KEY>` 付きで叩く。方法は何でもよい:
+   - Cloudflare Workers の cron: `apps/sync-cron` をそのまま使う。`wrangler.toml` の `SYNC_URL` を自分の Pages に変え、`cd apps/sync-cron && npx wrangler secret put SYNC_KEY && npx wrangler deploy`
+   - GitHub Actions の `schedule`、cron-job.org など
+3. 動作確認は手で 1 回叩く: 返ってくる JSON に各カレンダーの結果（unchanged / applied / pending / error）が出ます。
+
+叩かなければ自動更新は動かないだけで、他の機能に影響はありません。
+
 ## 3. ログインの戻り先
 
 Supabase の Authentication → URL Configuration で、Site URL と Redirect URLs に Pages の URL（`https://<プロジェクト名>.pages.dev` と、独自ドメインがあればそれも）を登録する。

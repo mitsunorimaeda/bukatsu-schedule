@@ -17,12 +17,17 @@ export function SheetSetup({ schoolId, calendarId, value, onChange }: { schoolId
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>();
 
-  const emit = (m: Partial<SheetMapping>, u = url) => {
+  const [auto, setAuto] = useState<'apply' | 'pending' | 'off'>(value?.auto ?? 'apply');
+  const emit = (m: Partial<SheetMapping>, u = url, a = auto) => {
     setMapping(m);
     const n = normalizeSheetUrl(u);
-    if (n && m.date != null && m.title != null) onChange({ kind: 'sheet', url: u.trim(), csvUrl: n.csvUrl, mapping: { headerRows: 1, ...m, date: m.date, title: m.title } });
-    else onChange(null);
+    if (n && m.date != null && m.title != null) {
+      const changedUrl = value && value.csvUrl !== n.csvUrl;
+      // 記録（lastSync など）は保つ。URL が変わったら指紋は捨てて次回に必ず取り込む
+      onChange({ ...(value ?? {}), kind: 'sheet', url: u.trim(), csvUrl: n.csvUrl, mapping: { headerRows: 1, ...m, date: m.date, title: m.title }, auto: a, lastHash: changedUrl ? undefined : value?.lastHash });
+    } else onChange(null);
   };
+  const fmtWhen = (iso?: string) => (iso ? new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
   const load = async () => {
     setErr(undefined);
@@ -132,6 +137,30 @@ export function SheetSetup({ schoolId, calendarId, value, onChange }: { schoolId
           </div>
           {mapping.date != null && <p className="hint">日付の読み: {sample.join('、')}</p>}
         </>
+      )}
+      {(rows || value) && (
+        <label>
+          自動更新（1 時間ごとにシートを見に行き、変わっていたら）
+          <select
+            value={auto}
+            onChange={(e) => {
+              const a = e.target.value as 'apply' | 'pending' | 'off';
+              setAuto(a);
+              emit(mapping, url, a);
+            }}
+          >
+            <option value="apply">そのまま反映する（シートが元データなので既定）</option>
+            <option value="pending">確認待ちにして、先生が反映する</option>
+            <option value="off">自動では見に行かない（「いま取り込む」だけ）</option>
+          </select>
+        </label>
+      )}
+      {value?.lastSync && (
+        <p className="hint">
+          最終確認 {fmtWhen(value.lastSync)}
+          {value.lastChange ? `・最後に変わったのは ${fmtWhen(value.lastChange)}（${value.lastCount ?? '?'} 件）` : '・まだ自動更新での取り込みはありません'}
+          {value.lastError ? <span style={{ color: 'var(--red)' }}>・前回のエラー: {value.lastError}</span> : ''}
+        </p>
       )}
     </div>
   );

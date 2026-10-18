@@ -9,7 +9,7 @@ import { SheetSetup } from './SheetSetup';
 const SOURCES: { kind: string; title: string; desc: string; soon?: boolean }[] = [
   { kind: 'manual', title: 'この画面で直接書く', desc: '表のマスをクリックして入力。Excel と同じ感覚' },
   { kind: 'pdf', title: 'いつもの PDF・写真を読ませる', desc: 'Excel で作った PDF、紙の写真でも可。AI が表に起こし、確認してから反映。鍵がなくても ChatGPT などの画面経由で可' },
-  { kind: 'sheet', title: 'Google シート / CSV をつなぐ', desc: 'シートの URL を登録し、列を選ぶ。「いま取り込む」で確認待ちに（自動更新は準備中）' },
+  { kind: 'sheet', title: 'Google シート / CSV をつなぐ', desc: 'シートの URL を登録して列を選ぶ。1 時間ごとに見に行き、変わっていれば取り込む' },
   { kind: 'template', title: '入力用のシートをもらう（準備中）', desc: '日付 × 班のテンプレを配布し、シートから送信する形を準備中', soon: true },
 ];
 
@@ -245,7 +245,7 @@ export function CalendarPanel({
                 <button className="primary" onClick={importNow} disabled={importing || !sheet}>
                   {importing ? '取り込み中…' : 'いま取り込む'}
                 </button>
-                <span className="hint">取りに行って「確認待ち」にします。反映はその後（含まれる月だけ入れ替わります）。自動更新は準備中。</span>
+                <span className="hint">いますぐ取りに行って「確認待ち」にします（反映はその後。含まれる月だけ入れ替わります）。自動更新は上の設定どおり 1 時間ごと。</span>
               </div>
             )}
             {importMsg && <div className="hint">{importMsg}</div>}
