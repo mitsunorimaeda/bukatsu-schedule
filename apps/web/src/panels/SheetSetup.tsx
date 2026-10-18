@@ -103,7 +103,7 @@ export function SheetSetup({ schoolId, calendarId, value, onChange, slots = [] }
       {rows && (
         <>
           <p className="hint" style={{ margin: 0 }}>
-            各列の見出しにあるプルダウンで、その列が「何の列か」を選びます。色が付いた列だけを使い、「使わない」のままの列（選手名など）は読み込んでも保存しません。
+            各列の見出しにあるプルダウンで、その列が「何の列か」を選びます。色が付いた列だけを使い、「使わない」のままの列は読み込んでも保存しません。<b>選手名が書かれた列は「使わない」のままにしてください</b>（内容にすると名前も予定として保存・配信されます）。
           </p>
           <div className="sheet-preview">
             <table>
