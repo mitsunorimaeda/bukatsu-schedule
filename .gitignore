@@ -8,5 +8,6 @@ supabase/.branches/
 out/
 apps/web/public/data/
 apps/web/public/mock/
+.cleanroom/
 fixtures/
 out_mock/
