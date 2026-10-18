@@ -1,11 +1,11 @@
-# 1 時間ごとに Pages の /api/sync を叩くだけの小さな Worker。
+# 5 分おきに Pages の /api/sync を叩くだけの小さな Worker（公開の予約の実行と、1 時間ごとのシート確認は Pages 側が判断）。
 # 必要な設定: vars.SYNC_URL（Pages の URL + /api/sync）、secret SYNC_KEY（Pages 側と同じ値。wrangler secret put SYNC_KEY）
 name = "bukatsu-schedule-sync"
 main = "src/index.ts"
 compatibility_date = "2026-06-01"
 
 [triggers]
-crons = ["7 * * * *"]
+crons = ["*/5 * * * *"]
 
 [vars]
 SYNC_URL = "https://bukatsu-schedule.pages.dev/api/sync"

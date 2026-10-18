@@ -59,6 +59,7 @@ interface LayerRow {
   publish_mode: 'auto' | 'manual';
   source: Calendar['source'];
   published_at: string | null;
+  publish_scheduled_at: string | null;
 }
 interface VersionRow {
   id: string;
@@ -215,6 +216,7 @@ export async function loadWorkspace(id: string): Promise<Workspace> {
       publishMode: l.publish_mode,
       source: l.source,
       publishedAt: l.published_at ?? undefined,
+      publishScheduledAt: l.publish_scheduled_at ?? undefined,
       versions: ((versions ?? []) as VersionRow[]).filter((v) => v.layer_id === l.id).map(toVersion),
       events: working,
       published,
@@ -338,6 +340,17 @@ export async function publishCalendar(schoolId: string, cal: Calendar): Promise<
 export async function approveVersion(versionId: string): Promise<void> {
   const { error } = await must().rpc('approve_version', { p_version: versionId });
   if (error) fail('反映できませんでした', error);
+}
+/** 公開の予約（null で取り消し）。手動公開のカレンダー向け */
+export async function schedulePublish(schoolId: string, cal: Calendar, at: string | null): Promise<void> {
+  if (at) await editableVersion(schoolId, cal);
+  const { error } = await must().rpc('schedule_publish', { p_school: schoolId, p_layer: cal.id, p_at: at });
+  if (error) fail('予約できませんでした', error);
+}
+/** 前の公開版に戻す（その内容を新しい公開版として写す） */
+export async function rollbackToVersion(versionId: string): Promise<void> {
+  const { error } = await must().rpc('rollback_to_version', { p_version: versionId });
+  if (error) fail('戻せませんでした', error);
 }
 export async function setVersionStatus(versionId: string, status: 'approved' | 'rejected'): Promise<void> {
   const sb = must();

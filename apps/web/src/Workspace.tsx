@@ -248,6 +248,11 @@ export function WorkspaceView({ id, token, email, startTour, onBack }: { id?: st
                       ) : (
                         <span className="hint">公開済み（手動公開）</span>
                       ))}
+                    {c.publishMode === 'manual' && c.publishScheduledAt && (
+                      <button className="ghost" style={{ padding: 0, color: 'var(--ink)' }} title="予約の内容を見る・取り消す" onClick={() => setPanel({ kind: 'publish', calId: c.id })}>
+                        {new Date(c.publishScheduledAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} に公開予定
+                      </button>
+                    )}
                     {dn > 0 && <span className="hint">下書き {dn} 件は公開されません</span>}
                   </div>
                 )}

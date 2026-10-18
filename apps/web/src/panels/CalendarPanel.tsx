@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { mergeSpans, normalize, parseCsv, sheetRowsToEvents } from '@bukatsu/core/browser';
 import type { LayerType, SheetSource } from '@bukatsu/core/browser';
-import { createPendingVersion, fetchSheetCsv, remapSlots, saveCalendar, deleteCalendar, type CalendarInput } from '../api';
+import { createPendingVersion, fetchSheetCsv, remapSlots, rollbackToVersion, saveCalendar, deleteCalendar, type CalendarInput } from '../api';
 import type { Calendar, Workspace } from '../model';
 import { Panel, useToast } from '../ui';
 import { SheetSetup } from './SheetSetup';
@@ -45,6 +45,9 @@ export function CalendarPanel({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [rollback, setRollback] = useState<string | null>(null);
+  const history = existing ? existing.versions.filter((v) => v.status === 'approved').sort((a, b) => b.importedAt.localeCompare(a.importedAt)).slice(0, 8) : [];
+  const fmtWhen = (iso: string) => new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   const count = (s: string) => (existing ? existing.events.filter((e) => e.slots.includes(s)).length : 0);
 
   useStateInit(() => {
@@ -283,6 +286,54 @@ export function CalendarPanel({
             </button>
           )}
         </div>
+        {existing && history.length > 0 && (
+          <details style={{ marginTop: 10 }}>
+            <summary>公開の履歴（前の版に戻す）</summary>
+            <ul className="history">
+              {history.map((v, i) => (
+                <li key={v.id}>
+                  <span>
+                    {fmtWhen(v.importedAt)}　{v.label}　{v.eventCount} 件{i === 0 ? '　（いま公開中）' : ''}
+                  </span>
+                  {i > 0 && (
+                    <button className="ghost" disabled={busy} onClick={() => setRollback(v.id)}>
+                      この版に戻す
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {rollback && (
+              <div className="notice">
+                「{history.find((v) => v.id === rollback)?.label}」の内容を新しい公開版として写します。リンク・ICS・PDF はすぐこの内容になります。履歴は残るので、あとで戻し直せます。
+                {existing.publishMode === 'manual' ? ' 編集中の内容も同じに揃えます（下書きは残ります）。' : ''}
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <button
+                    className="primary"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await rollbackToVersion(rollback);
+                        await onSaved();
+                        toast('戻しました。リンク・ICS・PDF にも反映されます');
+                        onClose();
+                      } catch (x) {
+                        setErr((x as Error).message);
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    戻す
+                  </button>
+                  <button className="ghost" onClick={() => setRollback(null)}>
+                    やめる
+                  </button>
+                </div>
+              </div>
+            )}
+          </details>
+        )}
         {confirmDelete && existing && (
           <div className="notice">
             「{existing.name}」と、その予定・版・共有範囲をすべて削除します。元に戻せません。

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { publishCalendar, approveVersion, setVersionStatus } from '../api';
+import { publishCalendar, approveVersion, schedulePublish, setVersionStatus } from '../api';
 import { changeLine, draftCount, unpublishedChanges, type Calendar, type Change, type Workspace } from '../model';
 import { Panel, copyText, useToast } from '../ui';
 
@@ -10,11 +10,72 @@ export function PublishPanel({ ws, cal, onClose, onDone }: { ws: Workspace; cal:
   const dn = draftCount(cal);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>();
+  const [when, setWhen] = useState(() => {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setMinutes(0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00`;
+  });
   const text = ch.map(changeLine).join('\n');
+  const fmt = (iso: string) => new Date(iso).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   return (
     <Panel title={`${cal.name} を公開する`} onClose={onClose}>
       <p className="hint">公開すると、閲覧リンク・ICS・PDF にこの内容が反映されます。下書き {dn} 件は含まれません。</p>
       <ChangeList changes={ch} />
+      {cal.publishScheduledAt && (
+        <div className="notice">
+          {fmt(cal.publishScheduledAt)} に公開する予約があります（そのとき編集中の内容が公開されます）。
+          <div style={{ marginTop: 4 }}>
+            <button
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await schedulePublish(ws.id, cal, null);
+                  await onDone();
+                  toast('予約を取り消しました');
+                  onClose();
+                } catch (e) {
+                  setErr((e as Error).message);
+                  setBusy(false);
+                }
+              }}
+            >
+              予約を取り消す
+            </button>
+          </div>
+        </div>
+      )}
+      <details style={{ marginTop: 8 }}>
+        <summary>日時を決めて公開する（予約）</summary>
+        <div className="row2" style={{ marginTop: 6 }}>
+          <label>
+            公開する日時
+            <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+          </label>
+          <button
+            disabled={busy || !when}
+            onClick={async () => {
+              setBusy(true);
+              setErr(undefined);
+              try {
+                const at = new Date(when);
+                if (!(at.getTime() > Date.now())) throw new Error('未来の日時を指定してください');
+                await schedulePublish(ws.id, cal, at.toISOString());
+                await onDone();
+                toast(`${fmt(at.toISOString())} に公開します。それまで編集した内容もそのとき一緒に公開されます`);
+                onClose();
+              } catch (e) {
+                setErr((e as Error).message);
+                setBusy(false);
+              }
+            }}
+          >
+            この日時に公開する
+          </button>
+        </div>
+        <p className="hint">5 分おきに確認して、その時刻を過ぎた最初の回に公開します（数分ずれることがあります）。</p>
+      </details>
       {err && <div className="error">{err}</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <button

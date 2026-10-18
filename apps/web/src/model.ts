@@ -48,6 +48,8 @@ export interface Calendar {
   publishMode: 'auto' | 'manual';
   source: { kind: string; [k: string]: unknown } | null;
   publishedAt?: string;
+  /** 公開の予約（手動公開）。ISO */
+  publishScheduledAt?: string;
   versions: Version[];
   /** 編集者が見る内容（手動公開なら working 版、自動なら公開中の版） */
   events: UiEvent[];

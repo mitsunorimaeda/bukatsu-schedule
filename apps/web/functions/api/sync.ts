@@ -1,6 +1,7 @@
 /**
  * シートの自動更新。定期実行（Cloudflare Workers の cron など）から叩く。
- *   POST /api/sync   Authorization: Bearer <SYNC_KEY>
+ *   POST /api/sync[?sheets=all]   Authorization: Bearer <SYNC_KEY>
+ *  5 分おきに叩かれる前提。期限の来た公開の予約を実行し、シートは前回から 55 分以上あいたものだけ見に行く（?sheets=all で全部）。
  * つないでいる全カレンダー（layers.source.kind = 'sheet'）の CSV を取りに行き、前回と違えば版を作る。
  * カレンダーごとの設定 source.auto: apply（そのまま反映・既定）/ pending（確認待ちにする）/ off（見に行かない）。
  * 結果は layers.source に lastSync / lastHash / lastCount / lastError として残す（画面の設定に出る）。
@@ -95,9 +96,15 @@ async function run(env: Env, request: Request): Promise<Response> {
   const key = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   if (key !== env.SYNC_KEY) return json({ error: '鍵が違います' }, 401);
   const started = Date.now();
+  // 1. 期限の来た公開の予約
+  const due = await sb(env, 'rpc/run_due_publishes', { method: 'POST', body: '{}' });
+  const published = due.ok ? ((await due.json()) as { school_id: string; layer_id: string; version_id: string | null }[]) : [];
+  // 2. シート（前回の確認から 55 分以上たったものだけ。定期実行は 5 分おき）
+  const url = new URL(request.url);
+  const force = url.searchParams.get('sheets') === 'all';
   const lr = await sb(env, 'layers?source->>kind=eq.sheet&select=school_id,id,name,type,slots,source');
   if (!lr.ok) return json({ error: `カレンダーを読めません: ${await lr.text()}` }, 502);
-  const layers = ((await lr.json()) as LayerRow[]).filter((l) => (l.source?.auto ?? 'apply') !== 'off' && l.source?.csvUrl);
+  const layers = ((await lr.json()) as LayerRow[]).filter((l) => (l.source?.auto ?? 'apply') !== 'off' && l.source?.csvUrl && (force || !l.source.lastSync || Date.now() - new Date(l.source.lastSync).getTime() > 55 * 60 * 1000));
   const sr = await sb(env, 'schools?select=id,settings');
   const settingsById = new Map((((await sr.json()) as { id: string; settings: SchoolSettings }[]) ?? []).map((s) => [s.id, s.settings]));
   const results: { layer: string; result: string }[] = [];
@@ -108,7 +115,7 @@ async function run(env: Env, request: Request): Promise<Response> {
     }
     results.push(await syncOne(env, l, settingsById.get(l.school_id) ?? ({} as SchoolSettings)));
   }
-  return json({ checked: layers.length, results, ms: Date.now() - started });
+  return json({ published: published.map((p) => `${p.school_id}/${p.layer_id}${p.version_id ? '' : ' (失敗: 編集中の内容なし)'}`), checked: layers.length, results, ms: Date.now() - started });
 }
 
 export const onRequestPost: PagesFunction<Env> = ({ request, env }) => run(env, request);
