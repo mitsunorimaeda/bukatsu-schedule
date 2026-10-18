@@ -66,7 +66,7 @@ export function SheetSetup({ schoolId, calendarId, value, onChange, slots = [] }
   const roleOf = (i: number): RoleKey | undefined => (titleCols.some((t) => t.col === i) ? 'title' : ROLES.find((r) => r.key !== 'title' && mapping[r.key] === i)?.key);
   const withTitles = (m: Partial<SheetMapping>, list: { col: number; slot?: string }[]): Partial<SheetMapping> => {
     const sorted = [...list].sort((a, b) => a.col - b.col);
-    const out = { ...m, title: sorted[0]?.col, titles: sorted.length > 1 ? sorted : undefined };
+    const out: Partial<SheetMapping> = { ...m, title: sorted[0]?.col, titles: sorted.length > 1 ? sorted : undefined };
     if (sorted.length === 0) delete out.title;
     if (!out.titles) delete out.titles;
     return out;
