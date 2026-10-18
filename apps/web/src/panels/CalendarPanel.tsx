@@ -286,6 +286,33 @@ export function CalendarPanel({
             </button>
           )}
         </div>
+        {confirmDelete && existing && (
+          <div className="notice" ref={(el) => el?.scrollIntoView({ block: 'nearest' })}>
+            「{existing.name}」と、その予定・版・共有範囲をすべて削除します。元に戻せません。
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <button
+                className="danger"
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await deleteCalendar(ws.id, existing.id);
+                    await onSaved();
+                    toast('削除しました');
+                    onClose();
+                  } catch (x) {
+                    setErr((x as Error).message);
+                    setBusy(false);
+                  }
+                }}
+              >
+                削除する
+              </button>
+              <button className="ghost" onClick={() => setConfirmDelete(false)}>
+                やめる
+              </button>
+            </div>
+          </div>
+        )}
         {existing && history.length > 0 && (
           <details style={{ marginTop: 10 }}>
             <summary>公開の履歴（前の版に戻す）</summary>
@@ -333,33 +360,6 @@ export function CalendarPanel({
               </div>
             )}
           </details>
-        )}
-        {confirmDelete && existing && (
-          <div className="notice">
-            「{existing.name}」と、その予定・版・共有範囲をすべて削除します。元に戻せません。
-            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-              <button
-                className="danger"
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await deleteCalendar(ws.id, existing.id);
-                    await onSaved();
-                    toast('削除しました');
-                    onClose();
-                  } catch (x) {
-                    setErr((x as Error).message);
-                    setBusy(false);
-                  }
-                }}
-              >
-                削除する
-              </button>
-              <button className="ghost" onClick={() => setConfirmDelete(false)}>
-                やめる
-              </button>
-            </div>
-          </div>
         )}
       </div>
     </Panel>
