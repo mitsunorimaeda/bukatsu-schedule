@@ -169,32 +169,41 @@ table.plain th{color:var(--muted);font-weight:500;font-size:12px}
 /* PDF プレビュー（用紙の実寸、入れ物の幅に合わせて縮小） */
 .pagewrap{position:relative;overflow:hidden;margin:0 auto 12px}
 .page{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden;background:#fff;color:#1f2328;box-shadow:0 2px 12px rgba(0,0,0,.18);padding:34px 38px;box-sizing:border-box;font-family:var(--font);display:flex;flex-direction:column}
-.page h4{margin:0 0 8px;font-size:16px;font-weight:700;letter-spacing:.02em}
-.page .sub{font-size:10px;color:#555;margin-bottom:8px;display:flex;gap:14px}
-.page table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10.5px;line-height:1.3}
-.page th,.page td{border:1px solid #9a9a9a;padding:3px 5px;vertical-align:top;text-align:left;overflow:hidden}
+.page h4{margin:0 0 calc(8px * var(--kp,1));font-size:16px;font-weight:700;letter-spacing:.02em}
+.page .sub{font-size:10px;color:#555;margin-bottom:calc(8px * var(--kp,1));display:flex;gap:14px}
+.page .body{flex:1 1 auto;min-height:0;overflow:hidden}
+.page table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:calc(10.5px * var(--k,1));line-height:1.3}
+.page th,.page td{border:1px solid #9a9a9a;padding:calc(3px * var(--kp,1)) max(2px, calc(5px * var(--kp,1)));vertical-align:top;text-align:left;overflow:hidden}
 .page th{background:#ececec;font-weight:600;text-align:center}
 .page thead th.calhead{border-top:3px solid var(--c,#888);background:#f4f4f4}
-.page thead th.slothead{font-weight:500;color:#444;background:#f9f9f9;font-size:10px}
+.page thead th.slothead{font-weight:500;color:#444;background:#f9f9f9;font-size:calc(10px * var(--k,1))}
 .page col.daycol{width:62px}
 .page td.d{white-space:nowrap;font-variant-numeric:tabular-nums;text-align:left;padding-left:6px}
-.page td.d b{font-weight:700;font-size:11.5px}
+.page td.d b{font-weight:700;font-size:calc(11.5px * var(--k,1))}
 .page td.d span{color:#555;margin-left:3px}
-.page td.d .mon{display:block;font-size:9px;color:#777;line-height:1}
+.page td.d .mon{display:block;font-size:calc(9px * var(--k,1));color:#777;line-height:1}
 .page tr.sat td{background:#f1f5fc}.page tr.sun td{background:#fcf1ef}
 .page tr.sun td{border-bottom:2px solid #666}
 .page td.shared{background:#fff3b0;text-align:center}
 .page td.empty{background-image:repeating-linear-gradient(135deg,transparent 0 6px,rgba(0,0,0,.025) 6px 7px)}
 .page .foot{margin-top:auto;font-size:9px;color:#666;display:flex;justify-content:space-between;padding-top:6px}
-.page .ev{margin:0 0 2px;line-height:1.25;color:#1f2328}
-.page .ev .t{display:block;font-family:var(--mono);font-size:9.5px;color:#333;font-weight:500}
-.page .ev .pl{display:block;color:#666;font-size:9px}
+.page .ev{margin:0 0 calc(2px * var(--kp,1));line-height:1.25;color:#1f2328}
+.page .ev .t{display:block;font-family:var(--mono);font-size:calc(9.5px * var(--k,1));color:#333;font-weight:500}
+.page.o-inline .ev .t{display:inline;margin-right:4px}
+.page .ev .pl{display:block;color:#666;font-size:calc(9px * var(--k,1))}
 .page .ev.k-off,.page .ev.k-self,.page .ev.k-holiday{color:#777}
 .page .ev.k-match,.page .ev.k-competition{color:#9b1c1c;font-weight:600}
 .page .ev.k-exam,.page .ev.k-pause\:test{color:#8a5a00;font-weight:600}
-.page .ev .cont{color:#777;font-weight:400;font-size:9px}
+.page .ev .cont{color:#777;font-weight:400;font-size:calc(9px * var(--k,1))}
+.pdfopts{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;margin:6px 0}
+.pdfopts label{display:inline-flex;gap:5px;align-items:center;width:auto;cursor:pointer}
+.pdfopts input{width:auto;margin:0}
+.pdfmodal .pdfopts{color:#fff;margin:0}
+.pdfnote{font-size:12px;color:var(--fg);background:var(--marker);border-radius:6px;padding:6px 10px;margin:0 0 8px}
+.pdfmodal .pdfnote{max-width:1200px;margin:0 auto 10px;color:#1f2328;background:#fff3a8}
+@media print{.pdfnote{display:none!important}}
 .pdfmodal{position:fixed;inset:0;background:rgba(20,22,26,.72);z-index:40;overflow:auto;padding:20px 24px 40px}
-.pdfmodal .bar{position:sticky;top:0;display:flex;gap:10px;align-items:center;color:#fff;margin-bottom:14px;z-index:1}
+.pdfmodal .bar{position:sticky;top:0;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:rgba(20,22,26,.9);padding:6px 0;color:#fff;margin-bottom:14px;z-index:1}
 .pdfmodal .bar button{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)}
 .pdfmodal .bar select{width:auto;background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.3)}
 .pdfmodal .bar option{color:#1f2328}

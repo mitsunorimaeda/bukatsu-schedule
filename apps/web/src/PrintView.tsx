@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { loadByToken, loadWorkspace } from './api';
 import { publicEvents, type Workspace } from './model';
-import { PAPERS, PdfPages, type Layout, type PdfCal } from './panels/PdfPages';
+import { PAPERS, PdfPages, type Layout, type PdfCal, type PdfOptions } from './panels/PdfPages';
 
 /** 共有・出力の「PDF を保存」から開く印刷専用ページ。プレビューと同じ描画を用紙の実寸で並べ、ブラウザの印刷（PDF に保存）に渡す */
 export interface PrintJob {
@@ -13,6 +13,7 @@ export interface PrintJob {
   to: string;
   layout: Layout;
   paper: string;
+  options?: PdfOptions;
 }
 
 export function savePrintJob(job: PrintJob): string {
@@ -85,7 +86,7 @@ export function PrintView({ jobKey }: { jobKey: string }) {
         <button onClick={() => window.close()}>閉じる</button>
       </div>
       <div className="pages">
-        <PdfPages wsName={ws.name} cals={cals} from={job.from} to={job.to} layout={job.layout} paper={job.paper} versionsNote={versionsNote} />
+        <PdfPages wsName={ws.name} cals={cals} from={job.from} to={job.to} layout={job.layout} paper={job.paper} versionsNote={versionsNote} options={job.options} />
       </div>
     </div>
   );

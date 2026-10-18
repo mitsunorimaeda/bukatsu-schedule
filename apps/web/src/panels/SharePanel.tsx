@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createShareLink, icsUrl, listShareLinks, revokeShareLink, shareUrl, type ShareLink, type ShareScope } from '../api';
 import { draftCount, md, publicEvents, todayYm, unpublishedChanges, type Workspace } from '../model';
 import { Panel, SlotPick, copyText, useToast } from '../ui';
-import { LAYOUTS, PAPERS, PdfPages, type Layout, type PdfCal } from './PdfPages';
+import { LAYOUTS, PAPERS, PdfOptionsPicker, PdfPages, loadPdfOptions, savePdfOptions, type Layout, type PdfCal, type PdfOptions } from './PdfPages';
 import { savePrintJob } from '../PrintView';
 
 type Tab = 'link' | 'ics' | 'pdf';
@@ -25,6 +25,11 @@ export function SharePanel({ ws, onClose, canManage, token }: { ws: Workspace; o
   const [layout, setLayout] = useState<Layout>('月間表');
   const [paper, setPaper] = useState('A4 横');
   const [big, setBig] = useState(false);
+  const [pdfOpts, setPdfOptsState] = useState<PdfOptions>(loadPdfOptions);
+  const setPdfOpts = (o: PdfOptions) => {
+    setPdfOptsState(o);
+    savePdfOptions(o);
+  };
 
   const slotsOn = (cid: string, all: string[]) => (slotSel[cid] ? all.filter((s) => slotSel[cid].includes(s)) : all);
   const chosen: PdfCal[] = useMemo(
@@ -232,18 +237,19 @@ export function SharePanel({ ws, onClose, canManage, token }: { ws: Workspace; o
                 </select>
               </label>
             </div>
+            <PdfOptionsPicker layout={layout} value={pdfOpts} onChange={setPdfOpts} />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0' }}>
               <button onClick={() => setBig(true)}>大きく見る</button>
               <span className="hint">
                 {scopeName}、{md(from)}〜{md(to)}。用紙の縦横比どおり
               </span>
             </div>
-            <PdfPages wsName={ws.name} cals={chosen} from={from} to={to} layout={layout} paper={paper} versionsNote={versionsNote} />
+            <PdfPages wsName={ws.name} cals={chosen} from={from} to={to} layout={layout} paper={paper} versionsNote={versionsNote} options={pdfOpts} />
             <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center' }}>
               <button
                 className="primary"
                 onClick={() => {
-                  const key = savePrintJob({ wsId: token ? undefined : ws.id, token, sel: [...sel], slotSel, from, to, layout, paper });
+                  const key = savePrintJob({ wsId: token ? undefined : ws.id, token, sel: [...sel], slotSel, from, to, layout, paper, options: pdfOpts });
                   window.open(`${location.pathname}#print/${key}`, '_blank');
                 }}
               >
@@ -271,11 +277,12 @@ export function SharePanel({ ws, onClose, canManage, token }: { ws: Workspace; o
             <span style={{ color: '#ddd', fontSize: 12 }}>
               {md(from)}〜{md(to)}
             </span>
+            <PdfOptionsPicker layout={layout} value={pdfOpts} onChange={setPdfOpts} />
             <span className="spacer" />
             <button onClick={() => setBig(false)}>閉じる</button>
           </div>
           <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-            <PdfPages wsName={ws.name} cals={chosen} from={from} to={to} layout={layout} paper={paper} versionsNote={versionsNote} />
+            <PdfPages wsName={ws.name} cals={chosen} from={from} to={to} layout={layout} paper={paper} versionsNote={versionsNote} options={pdfOpts} />
           </div>
         </div>
       )}

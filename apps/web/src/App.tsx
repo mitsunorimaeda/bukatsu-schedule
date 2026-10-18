@@ -8,6 +8,8 @@ import { ToastProvider } from './ui';
 
 const PARAMS = new URLSearchParams(location.search);
 const TOKEN = PARAMS.get('token');
+/** 印刷用の画面（「PDF を保存」で開く別タブ）。起動時の URL で決める（あとで # を書き換えても印刷画面のまま） */
+const PRINT_KEY = location.hash.startsWith('#print/') ? location.hash.slice(7) : null;
 
 /**
  * 3 つの入口
@@ -26,6 +28,7 @@ export default function App() {
     return onAuthChange(setSession);
   }, []);
   useEffect(() => {
+    if (PRINT_KEY) return;
     try {
       location.hash = route.kind === 'ws' ? `ws/${encodeURIComponent(route.id)}` : '';
     } catch {
@@ -33,8 +36,7 @@ export default function App() {
     }
   }, [route]);
 
-  const printKey = location.hash.startsWith('#print/') ? location.hash.slice(7) : null;
-  if (printKey) return <PrintView jobKey={printKey} />;
+  if (PRINT_KEY) return <PrintView jobKey={PRINT_KEY} />;
   if (TOKEN) {
     return (
       <ToastProvider>
