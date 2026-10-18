@@ -6,6 +6,26 @@ import type { ClubTableResult, SchoolCalendarResult } from './ai/prompts.js';
 import { DEFAULT_CLUB_KIND_RULES, DEFAULT_SCHOOL_KIND_RULES, inferKind, parseTimeRange } from './normalize.js';
 import type { Kind, ScheduleEventInput, SchoolSettings } from './types.js';
 import { DEFAULT_SCHOOL_SETTINGS } from './types.js';
+import { currentFiscalYear, parseSheetDate } from './sheet.js';
+
+/**
+ * AI の返事の日付を YYYY-MM-DD にそろえる。「4/1」「4月1日」「2026/4/1」「R8.4.1」など。
+ * year が分かっていれば（部活の月間表の year）その年、無ければ年度（4 月始まり）から補う。読めなければ undefined。
+ */
+export function normalizeAiDate(raw: string | null | undefined, opt: { year?: number; fiscalYear?: number }): string | undefined {
+  if (raw == null) return undefined;
+  const s = String(raw).trim();
+  if (!s) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const md = s.replace(/[（(].*?[）)]/g, '').match(/^(\d{1,2})[/.\-月](\d{1,2})日?$/);
+  if (md && opt.year) {
+    const m = +md[1];
+    const d = +md[2];
+    if (m < 1 || m > 12 || d < 1 || d > 31) return undefined;
+    return `${opt.year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  return parseSheetDate(s, opt.fiscalYear ?? (opt.year ? (opt.year <= 12 ? currentFiscalYear() : opt.year) : currentFiscalYear()));
+}
 
 export interface ClubConvertOptions {
   school: string;
@@ -14,6 +34,8 @@ export interface ClubConvertOptions {
   settings?: SchoolSettings;
   /** 班の別名。例: サテライト → [サテライト県3部, サテライト県4部] */
   categoryAliases?: Record<string, string[]>;
+  /** 日付が読めず飛ばしたセルの通知（画面で件数を出す） */
+  onSkip?: (cell: { date: string; category: string; text: string }) => void;
 }
 
 /**
@@ -52,9 +74,15 @@ export function clubTableToEvents(res: ClubTableResult, o: ClubConvertOptions): 
 function clubCellsToEvents(res: ClubTableResult, o: ClubConvertOptions): ScheduleEventInput[] {
   const settings = o.settings ?? DEFAULT_SCHOOL_SETTINGS;
   const out: ScheduleEventInput[] = [];
+  const yearHint = res.year && res.year > 1900 ? res.year : undefined;
   for (const c of res.cells) {
-    const text = c.text.trim();
+    const text = (c.text ?? '').trim();
     if (!text) continue;
+    const date = normalizeAiDate(c.date, { year: yearHint });
+    if (!date) {
+      o.onSkip?.(c);
+      continue;
+    }
     const cats = o.categoryAliases?.[c.category] ?? [c.category];
     for (const category of cats) {
       const base = {
@@ -62,7 +90,7 @@ function clubCellsToEvents(res: ClubTableResult, o: ClubConvertOptions): Schedul
         layer: o.layer,
         layerType: 'club' as const,
         category,
-        date: c.date,
+        date,
         sourceRef: `${o.fileRef}#${c.date}/${c.category}`,
         note: c.highlighted ? '元の表で強調表示' : undefined,
       };
@@ -106,17 +134,20 @@ export function schoolItemsToEvents(res: SchoolCalendarResult, o: SchoolConvertO
         break;
       }
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(it.date)) {
-      warnings.push(`日付が不正: ${JSON.stringify(it)}`);
+    const fy = res.fiscal_year && res.fiscal_year > 1900 ? res.fiscal_year : undefined;
+    const date = normalizeAiDate(it.date, { fiscalYear: fy });
+    if (!date) {
+      warnings.push(`日付が読めません: ${JSON.stringify(it)}`);
       continue;
     }
+    const endDate = normalizeAiDate(it.end_date ?? undefined, { fiscalYear: fy });
     events.push({
       school: o.school,
       layer: o.layer,
       layerType: 'school',
       category,
-      date: it.date,
-      endDate: it.end_date ?? undefined,
+      date,
+      endDate: endDate && endDate > date ? endDate : undefined,
       kind: inferKind(text, DEFAULT_SCHOOL_KIND_RULES, 'school_event'),
       title: text,
       note: it.approximate ? '欄外の記載。日付は近似' : undefined,

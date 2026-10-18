@@ -32,7 +32,7 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
   const [pasted, setPasted] = useState('');
   const [copied, setCopied] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [result, setResult] = useState<{ count: number; costYen?: number; unknownSlots: string[] } | null>(null);
+  const [result, setResult] = useState<{ count: number; costYen?: number; unknownSlots: string[]; skipped?: string[] } | null>(null);
   const cal: Calendar | undefined = ws.calendars.find((c) => c.id === target);
   const kind = cal?.type === 'school' ? 'school-calendar' : 'club-table';
 
@@ -120,19 +120,21 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
     try {
       const fileRef = 'manual-ai';
       let events;
+      const skipped: string[] = [];
       if (kind === 'school-calendar') {
         const r = parseManualResult(pasted, 'school-calendar');
         const conv = schoolItemsToEvents(r, { school: ws.id, layer: cal.id, fileRef, prefixCategories: (cal.source?.prefixCategories as Record<string, string> | undefined) ?? { '南:': '南校舎', '南：': '南校舎' } });
+        skipped.push(...conv.warnings);
         events = mergeSpans(normalize(conv.events, ws.settings));
       } else {
         const r = parseManualResult(pasted, 'club-table');
-        const conv = clubTableToEvents(r, { school: ws.id, layer: cal.id, fileRef, settings: ws.settings, categoryAliases: cal.source?.categoryAliases as Record<string, string[]> | undefined });
+        const conv = clubTableToEvents(r, { school: ws.id, layer: cal.id, fileRef, settings: ws.settings, categoryAliases: cal.source?.categoryAliases as Record<string, string[]> | undefined, onSkip: (c) => skipped.push(`${c.date} ${c.category}: ${c.text.slice(0, 20)}`) });
         events = mergeSpans(normalize(conv, ws.settings));
       }
-      if (events.length === 0) throw new Error('予定が 1 件も作れませんでした。返事の中身を確かめてください');
+      if (events.length === 0) throw new Error(`予定が 1 件も作れませんでした${skipped.length ? `（日付が読めない行 ${skipped.length}: ${skipped.slice(0, 2).join(' / ')}）` : ''}。返事の中身を確かめてください`);
       const label = `${new Date().toLocaleDateString('ja-JP')} 自分の AI で読み取り`;
       const r = await createPendingVersion(ws.id, cal, label, events, fileRef);
-      setResult(r);
+      setResult({ ...r, skipped });
       setStep(3);
       await onDone();
     } catch (e) {
@@ -262,6 +264,12 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
           <p>
             {cal?.name} に <b>{result.count} 件</b>を読み取りました{result.costYen != null ? `（約 ${result.costYen} 円）` : ''}。「確認待ち」として左に出ています。
           </p>
+          {result.skipped && result.skipped.length > 0 && (
+            <div className="notice">
+              日付が読めず飛ばした行が {result.skipped.length} 件あります: {result.skipped.slice(0, 3).join(' / ')}
+              {result.skipped.length > 3 ? ' …' : ''}。必要なら AI に「日付は YYYY-MM-DD で」と頼んで貼り直してください。
+            </div>
+          )}
           {result.unknownSlots.length > 0 && (
             <div className="notice">
               設定にない班がありました: {result.unknownSlots.join('・')}
