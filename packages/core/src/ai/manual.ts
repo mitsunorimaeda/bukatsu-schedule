@@ -76,7 +76,7 @@ export function parseManualResult(text: string, kind: 'club-table' | 'school-cal
   if (rows.length === 0) throw new Error(`「${key}」の中に date と text を持つ項目がありません`);
   if (kind === 'club-table') {
     const categories = Array.isArray(first.categories) ? (first.categories as string[]) : [...new Set(rows.map((r) => String(r.category ?? '全体')))];
-    return { title: String(first.title ?? ''), year: Number(first.year) || new Date().getFullYear(), month: Number(first.month) || 0, categories, cells: rows.map((r) => ({ date: String(r.date), category: String(r.category ?? categories[0] ?? '全体'), text: String(r.text), place: r.place == null ? null : String(r.place), merged: !!r.merged, highlighted: !!r.highlighted })), notes: Array.isArray(first.notes) ? (first.notes as string[]) : [] } as ClubTableResult;
+    return { title: String(first.title ?? ''), year: Number(first.year) || new Date().getFullYear(), month: Number(first.month) || 0, categories, cells: rows.map((r) => ({ date: String(r.date), end_date: r.end_date == null ? null : String(r.end_date), category: String(r.category ?? categories[0] ?? '全体'), text: String(r.text), place: r.place == null ? null : String(r.place), merged: !!r.merged, highlighted: !!r.highlighted })), notes: Array.isArray(first.notes) ? (first.notes as string[]) : [] } as ClubTableResult;
   }
   return { fiscal_year: Number(first.fiscal_year) || new Date().getFullYear(), months: Array.isArray(first.months) ? (first.months as string[]) : [], items: rows.map((r) => ({ date: String(r.date), end_date: r.end_date == null ? null : String(r.end_date), column: String(r.column ?? '生徒'), text: String(r.text), approximate: !!r.approximate })) } as SchoolCalendarResult;
 }

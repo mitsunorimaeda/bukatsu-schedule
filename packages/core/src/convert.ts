@@ -76,13 +76,17 @@ function clubCellsToEvents(res: ClubTableResult, o: ClubConvertOptions): Schedul
   const out: ScheduleEventInput[] = [];
   const yearHint = res.year && res.year > 1900 ? res.year : undefined;
   for (const c of res.cells) {
-    const text = (c.text ?? '').trim();
+    const lines = (c.text ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    const text = lines[0] ?? '';
     if (!text) continue;
+    const restNote = lines.length > 1 ? lines.slice(1).join(' / ') : undefined;
     const date = normalizeAiDate(c.date, { year: yearHint });
     if (!date) {
       o.onSkip?.(c);
       continue;
     }
+    const endRaw = normalizeAiDate(c.end_date ?? undefined, { year: yearHint });
+    const endDate = endRaw && endRaw > date ? endRaw : undefined;
     const cats = o.categoryAliases?.[c.category] ?? [c.category];
     for (const category of cats) {
       const base = {
@@ -91,8 +95,9 @@ function clubCellsToEvents(res: ClubTableResult, o: ClubConvertOptions): Schedul
         layerType: 'club' as const,
         category,
         date,
+        endDate,
         sourceRef: `${o.fileRef}#${c.date}/${c.category}`,
-        note: c.highlighted ? '元の表で強調表示' : undefined,
+        note: [restNote, c.highlighted ? '元の表で強調表示' : undefined].filter(Boolean).join(' / ') || undefined,
       };
       if (c.category === '朝練') {
         out.push({ ...base, kind: 'practice', title: `朝練（${text}）` });
@@ -104,6 +109,8 @@ function clubCellsToEvents(res: ClubTableResult, o: ClubConvertOptions): Schedul
         continue;
       }
       let kind = inferKind(text, DEFAULT_CLUB_KIND_RULES, 'event');
+      // 学校行事の表（祝日・考査・授業なしなど）を部活の表と同じ指示文で読んだときのために、学校向けの規則も試す
+      if (kind === 'event') kind = inferKind(text, DEFAULT_SCHOOL_KIND_RULES, 'event');
       if (/リカバリー/.test(text)) kind = 'event';
       const t = kind === 'practice' || kind === 'match' ? parseTimeRange(text, settings) : {};
       out.push({ ...base, kind, title: text, timeStart: t.start, timeEnd: t.end, place: c.place ?? undefined });

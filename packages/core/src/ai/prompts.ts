@@ -80,6 +80,8 @@ export const SCHOOL_CALENDAR_PROMPT: Prompt<SchoolCalendarResult> = {
 /** 部活の月間予定表（日 × カテゴリ列。横結合セル = 全カテゴリ共通） */
 export interface ClubTableCell {
   date: string;
+  /** 縦の矢印や「(～5日)」で期間が示されていれば最終日 */
+  end_date?: string | null;
   category: string;
   text: string;
   place?: string | null;
@@ -100,7 +102,7 @@ export interface ClubTableResult {
 
 export const CLUB_TABLE_PROMPT: Prompt<ClubTableResult> = {
   id: 'club-table',
-  version: 1,
+  version: 2,
   model: MODEL_COMPLEX_LAYOUT,
   system: `あなたは部活動の月間予定表（日付 × カテゴリの表）を読み取り、セル単位で構造化する係です。${NO_NAMES}`,
   schema: {
@@ -117,9 +119,10 @@ export const CLUB_TABLE_PROMPT: Prompt<ClubTableResult> = {
           type: 'object',
           required: ['date', 'category', 'text'],
           properties: {
-            date: { type: 'string' },
+            date: { type: 'string', description: 'YYYY-MM-DD' },
+            end_date: { type: ['string', 'null'], description: '縦の矢印・縦線や「(～5日)」「8/3~5」で複数日にわたることが示されていれば最終日 YYYY-MM-DD。単日なら null' },
             category: { type: 'string' },
-            text: { type: 'string', description: 'セルの本文。場所列の値は含めない' },
+            text: { type: 'string', description: 'セルの本文 1 項目。場所列の値は含めない。改行で複数の項目があれば項目ごとに別の cell にする' },
             place: { type: ['string', 'null'], description: '隣の場所列の値' },
             merged: { type: 'boolean' },
             highlighted: { type: 'boolean' },
@@ -138,6 +141,9 @@ export const CLUB_TABLE_PROMPT: Prompt<ClubTableResult> = {
       '各カテゴリ列の右隣にある「場所」列は place に入れ、text には含めないでください。',
       '左端の日付・曜日列を正とし、右端に別の曜日列があっても無視してください。',
       '赤字・太字・網掛けで強調されたセルは highlighted: true にしてください。',
+      '縦の矢印や縦線、「(～5日)」「8/3~5」のように複数日にわたる予定は、開始日の cell に end_date として最終日を入れてください（途中の日には繰り返さない）。',
+      '1 つのセルに改行や「・」で複数の項目があれば、項目ごとに別の cell にしてください。',
+      '日付は必ず YYYY-MM-DD にしてください。表が年間予定（月ごとの列）でも、各項目を実際の日付に直してください。',
       '空欄のセルは出力しないでください。',
     ]
       .filter(Boolean)
