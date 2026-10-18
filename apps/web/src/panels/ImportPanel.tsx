@@ -1,10 +1,104 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CLUB_TABLE_PROMPT, SCHOOL_CALENDAR_PROMPT, clubTableToEvents, manualPrompt, mergeSpans, normalize, parseManualResult, schoolItemsToEvents } from '@bukatsu/core/browser';
+import { CLUB_TABLE_PROMPT, READ_LAYOUTS, READ_PLACES, READ_SUBJECTS, SCHOOL_CALENDAR_PROMPT, clubTableToEvents, manualPrompt, mergeSpans, normalize, parseManualResult, readOptionsToVars, schoolItemsToEvents } from '@bukatsu/core/browser';
+import type { ReadLayout, ReadOptions, ReadPlace } from '@bukatsu/core/browser';
 import { createPendingVersion, saveCalendar, supabase } from '../api';
 import type { Calendar, Workspace } from '../model';
 import { Panel, useToast } from '../ui';
 
 type Mode = 'api' | 'manual';
+
+function currentFiscalYear(): number {
+  const d = new Date();
+  return d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+/** 読み方の設定の初期値。カレンダーに保存済みならそれ、無ければ種類から推定 */
+function initialReadOptions(cal: Calendar | undefined): ReadOptions {
+  const saved = (cal?.source?.read as ReadOptions | undefined) ?? {};
+  const school = cal?.type === 'school';
+  const layout: ReadLayout = saved.layout ?? (school ? 'year-grid' : 'date-rows');
+  return {
+    subject: saved.subject ?? (school ? '学校行事' : '部活動'),
+    layout,
+    year: saved.year ?? (layout === 'year-grid' ? currentFiscalYear() : new Date().getFullYear()),
+    place: saved.place ?? 'none',
+    extra: saved.extra ?? '',
+  };
+}
+
+/**
+ * 指示文を表に合わせるための質問（何の表か・形・年・場所・補足）。
+ * 答えはカレンダーに保存され、次回からそのまま使える。API 経路でも同じ答えをサーバーに渡す。
+ */
+function ReadQuestions({ ro, onChange, slots }: { ro: ReadOptions; onChange: (o: ReadOptions) => void; slots: string[] }) {
+  const known = READ_SUBJECTS.some((s) => s.id === ro.subject);
+  const [other, setOther] = useState(!known);
+  const set = (patch: Partial<ReadOptions>) => onChange({ ...ro, ...patch });
+  const yearIsFiscal = ro.layout === 'year-grid';
+  return (
+    <div className="readq">
+      <div className="readq-title">
+        <b>読み方を表に合わせる</b>
+        <span className="hint">答えに合わせて指示文が変わります。次回から覚えています。</span>
+      </div>
+      <div className="readq-grid">
+        <label>
+          何の予定表ですか
+          <select
+            value={other ? 'other' : ro.subject}
+            onChange={(e) => {
+              if (e.target.value === 'other') {
+                setOther(true);
+                set({ subject: '' });
+              } else {
+                setOther(false);
+                set({ subject: e.target.value });
+              }
+            }}
+          >
+            {READ_SUBJECTS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+            <option value="other">その他（自分で書く）</option>
+          </select>
+          {other && <input value={ro.subject ?? ''} placeholder="例: 地域のスポーツ少年団" onChange={(e) => set({ subject: e.target.value })} />}
+        </label>
+        <label>
+          表の形
+          <select value={ro.layout} onChange={(e) => set({ layout: e.target.value as ReadLayout })}>
+            {READ_LAYOUTS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <span className="hint">{READ_LAYOUTS.find((l) => l.id === ro.layout)?.desc}</span>
+        </label>
+        <label>
+          {yearIsFiscal ? '年度（西暦、4 月始まり）' : '年（西暦）'}
+          <input type="number" inputMode="numeric" value={ro.year ?? ''} placeholder="空なら曜日から推定" onChange={(e) => set({ year: e.target.value ? Number(e.target.value) : undefined })} />
+        </label>
+        <label>
+          場所の書かれ方
+          <select value={ro.place} onChange={(e) => set({ place: e.target.value as ReadPlace })}>
+            {READ_PLACES.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="wide">
+          読み方の補足（任意）
+          <input value={ro.extra ?? ''} placeholder="例: 右端の曜日列は無視 / 赤字は変更点 / 2 ページ目は読まない" onChange={(e) => set({ extra: e.target.value })} />
+        </label>
+      </div>
+      <p className="hint">{slots.length > 1 ? `区分（列）は「${slots.join(' / ')}」として読みます。表にそれ以外の区分があれば、読み取り後に班として追加できます。` : '区分（班）は 1 つなので、すべて同じ列として読みます。'}</p>
+    </div>
+  );
+}
 
 /**
  * 取り込み（PDF・写真）。2 つの経路があり、どちらも「確認待ち」の版になる。
@@ -55,16 +149,33 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
     }
   };
 
-  const fiscalYear = useMemo(() => {
-    const d = new Date();
-    return d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;
-  }, []);
+  const [ro, setRo] = useState<ReadOptions>(() => initialReadOptions(cal));
+  useEffect(() => {
+    setRo(initialReadOptions(cal));
+    setCopied(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cal?.id]);
+  const vars = useMemo(() => (cal ? { ...readOptionsToVars(ro), categories: cal.slots.join(', ') } : {}), [ro, cal]);
   const prompt = useMemo(() => {
     if (!cal) return '';
-    return kind === 'school-calendar' ? manualPrompt(SCHOOL_CALENDAR_PROMPT, { fiscalYear: String(fiscalYear) }) : manualPrompt(CLUB_TABLE_PROMPT, { clubName: cal.name, categories: cal.slots.join(', ') });
-  }, [cal, kind, fiscalYear]);
+    return kind === 'school-calendar' ? manualPrompt(SCHOOL_CALENDAR_PROMPT, vars) : manualPrompt(CLUB_TABLE_PROMPT, vars);
+  }, [cal, kind, vars]);
+
+  /** 答えをカレンダーに覚えさせる（失敗しても取り込みは続ける） */
+  const rememberReadOptions = async () => {
+    if (!cal) return;
+    const prev = (cal.source?.read as ReadOptions | undefined) ?? {};
+    const next: ReadOptions = { subject: ro.subject, layout: ro.layout, year: ro.year, place: ro.place, extra: ro.extra?.trim() || undefined };
+    if (JSON.stringify(prev) === JSON.stringify(next)) return;
+    try {
+      await saveCalendar(ws.id, { id: cal.id, name: cal.name, color: cal.color, type: cal.type, slots: cal.slots, publishMode: cal.publishMode, source: { ...(cal.source ?? { kind: 'manual' }), read: next } });
+    } catch {
+      /* 覚えられなくても取り込みはできる */
+    }
+  };
 
   const copyPrompt = async () => {
+    void rememberReadOptions();
     try {
       await navigator.clipboard.writeText(prompt);
       setCopied(true);
@@ -81,7 +192,8 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
     setErr(undefined);
     setStep(2);
     setProgress(5);
-    const texts = ['ファイルを送っています…', '表のレイアウト（列と班の対応）を読んでいます…', '結合セル（大会日・OFF）を各班に展開しています…', '日付と時刻を整えています…'];
+    void rememberReadOptions();
+    const texts = ['ファイルを送っています…', '表の形（列と区分の対応）を読んでいます…', '複数の列にまたがるマスを各区分に展開しています…', '日付と時刻を整えています…'];
     let i = 0;
     setMsg(texts[0]);
     const timer = setInterval(() => {
@@ -98,6 +210,7 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
       fd.append('calendarId', cal.id);
       fd.append('kind', kind);
       fd.append('label', file.name.replace(/\.[^.]+$/, ''));
+      fd.append('variables', JSON.stringify(vars));
       const res = await fetch('/api/import', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` }, body: fd });
       const body = (await res.json()) as { error?: string; count: number; costYen: number; unknownSlots: string[] };
       if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -150,8 +263,6 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
     setResult({ ...result, unknownSlots: [] });
   };
 
-  const readHint = cal && cal.slots.length > 1 ? `列は「${cal.slots.join(' / ')}」として読みます。表にそれ以外の列があれば、読み取り後に班として追加できます。` : kind === 'school-calendar' ? '年間行事予定として、生徒 / 学校・その他 の列と縦矢印（期間）を読みます。' : '';
-
   return (
     <Panel title="PDF・写真を取り込む" onClose={onClose}>
       <div className="steps">
@@ -181,6 +292,8 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
             </button>
           </div>
 
+          {cal && <ReadQuestions key={cal.id} ro={ro} onChange={setRo} slots={cal.slots} />}
+
           {mode === 'api' && (
             <>
               <div
@@ -206,7 +319,7 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
                 </div>
               </div>
               <p className="hint">
-                ファイルは読み取りのためだけに Anthropic の Claude API に送られ、保存されません。生徒の氏名は取り込みません。{readHint}
+                ファイルは読み取りのためだけに Anthropic の Claude API に送られ、保存されません。生徒の氏名は取り込みません。
               </p>
               {err && <div className="error">{err}</div>}
               <button className="primary" disabled={!file || !cal} onClick={startApi}>
@@ -231,7 +344,7 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
                 </li>
                 <li>
                   <b>2.</b> いつも使っている AI（ChatGPT・Gemini・Claude）を開き、<b>PDF か写真を添付</b>して、コピーした指示文を貼って送信。
-                  <div className="hint">{readHint}</div>
+                  <div className="hint">表の読み取りの正確さは AI によって差があります。結果がずれるときは別の AI や、その AI の「じっくり考える」モードを試してください。読み取り後の確認画面で直せます。</div>
                 </li>
                 <li>
                   <b>3.</b> 返ってきた返事を<b>全部コピー</b>して、ここに貼る（コードブロックごとで大丈夫。途中で切れたら「続きを出して」と頼み、続けて貼る）。

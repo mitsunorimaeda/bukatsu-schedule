@@ -89,14 +89,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     let model: string;
     let usage: { input: number; output: number };
     const fileRef = `upload:${file.name}`;
+    // 読み方の設定（何の表か・形・年・場所）は画面から variables で来る。区分は層の班から
+    const vars = { categories: layer.slots.join(', '), ...variables };
     if (kind === 'school-calendar') {
-      const r = await readWithClaude<SchoolCalendarResult>(env, SCHOOL_CALENDAR_PROMPT, file, variables);
+      const r = await readWithClaude<SchoolCalendarResult>(env, SCHOOL_CALENDAR_PROMPT, file, vars);
       const conv = schoolItemsToEvents(r.json, { school: schoolId, layer: calendarId, fileRef, prefixCategories: (layer.source?.prefixCategories as Record<string, string> | undefined) ?? { '南:': '南校舎', '南：': '南校舎' } });
       events = mergeSpans(normalize(conv.events, school?.settings as never));
       model = r.model;
       usage = r.usage;
     } else {
-      const vars = { clubName: layer.name, categories: layer.slots.join(', '), ...variables };
       const r = await readWithClaude<ClubTableResult>(env, CLUB_TABLE_PROMPT, file, vars);
       const conv = clubTableToEvents(r.json, { school: schoolId, layer: calendarId, fileRef, settings: school?.settings as never, categoryAliases: layer.source?.categoryAliases as Record<string, string[]> | undefined });
       events = mergeSpans(normalize(conv, school?.settings as never));

@@ -69,6 +69,10 @@ export function HelpPanel({ onClose, onTour }: { onClose: () => void; onTour: ()
           <p style={{ margin: '4px 0' }}>1 枚あたり 20〜25 円です。読み取った結果は確認してから反映するので、誤読はその場で直せます。</p>
         </details>
         <details>
+          <summary>自分の AI に読ませるとき、どの AI がいい？</summary>
+          <p style={{ margin: '4px 0' }}>表の読み取りの正確さは AI とモードで差があります。日付の列と内容がずれる、期間が落ちるといったときは、別の AI か「じっくり考える」モードで試してください。取り込み画面の「読み方を表に合わせる」で表の形（縦に日付・月めくり・年間・一覧）と年を答えると、指示文がその表向けになります。結果は確認画面で直せます。</p>
+        </details>
+        <details>
           <summary>生徒の名前は？</summary>
           <p style={{ margin: '4px 0' }}>取り込みません。名簿や当番表が載った PDF でも、氏名は読み飛ばします。</p>
         </details>
