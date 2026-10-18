@@ -14,8 +14,9 @@ AI の鍵（Anthropic の API キー）は**無くても使えます**。鍵が�
    notify pgrst, 'reload config';
    ```
    （Project Settings → Data API → Exposed schemas に `bukatsu` を足しても同じ）
-4. Authentication → Providers で Email を有効にする（マジックリンクだけでよければパスワードは不要）。
-5. Project Settings → API Keys から、publishable（anon）キーと service_role キーを控える。
+4. Authentication → Providers の Email が有効なことを確認する（新規プロジェクトでは最初から有効。マジックリンクだけでよければパスワードは不要）。
+5. Project Settings → API Keys から、publishable キー（`sb_publishable_…`。古い形式の anon キーでも可）と service_role（secret）キーを控える。
+6. **最初のログインはメールのマジックリンクです。** Authentication → URL Configuration の Site URL と Redirect URLs に、あとで作る Pages の URL（`https://<プロジェクト名>.pages.dev`）を入れておかないと、メールのリンクが localhost に飛んで入れません（手順 3 と同じ内容。先にやっておくと楽です）。
 
 ## 2. Cloudflare Pages
 
@@ -24,9 +25,11 @@ npm install
 cp apps/web/.env.production.example apps/web/.env.production   # Supabase の URL と publishable キーを書く
 cd apps/web && npm run build
 npx wrangler login
-npx wrangler pages project create <プロジェクト名>
+npx wrangler pages project create <プロジェクト名> --production-branch main
 npx wrangler pages deploy dist --project-name <プロジェクト名> --branch main
 ```
+
+`apps/web/wrangler.toml` の `name` は配布元のプロジェクト名のままですが、`--project-name` を付ければそちらが使われます（気になれば `name` を自分のプロジェクト名に書き換えてください）。secret は `printf '%s' '<値>' | npx wrangler pages secret put <名前> --project-name <プロジェクト名>` でも置けます。
 
 Pages の Settings → Variables and Secrets に、Production 向けの secret を置く（置いたら再デプロイ）:
 
@@ -55,7 +58,9 @@ Supabase の Authentication → URL Configuration で、Site URL と Redirect UR
 
 ## 4. 動作確認
 
-1. サイトを開き、メールでログイン → 「自分の予定表を作る」。
+service_role キーを置く前でも、ログイン・入力・共有リンク・ICS・PDF・「自分の AI に読ませる」取り込み・シートの接続は動きます。service_role が要るのは、アプリに PDF を読ませる経路（`ANTHROPIC_API_KEY` も必要）と定期実行（`/api/sync`）だけです。
+
+1. サイトを開き、メールでログイン（届いたリンクを開く） → 「自分の予定表を作る」。
 2. 「＋ カレンダー」で部を作り、表のマスをクリックして予定を 1 つ入れる。
 3. 「共有・出力」で閲覧リンクと ICS の URL を作り、別のブラウザ（ログインしていない状態）で開けることを確認する。
 4. 「PDF・シートを取り込む」→「自分の AI に読ませて貼り付ける」で、指示文をコピー → ChatGPT などに PDF と一緒に貼る → 返事を貼り戻す → 「確認して反映」。
