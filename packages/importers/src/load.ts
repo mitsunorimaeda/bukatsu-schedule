@@ -1,6 +1,6 @@
 /**
  * 取り込み結果を Supabase に保存する。
- *   npm run load -- --school schools/meiden.yaml [--target local|cloud] [--layer id] [--ai mock|live|record] [--online] [--approve]
+ *   npm run load -- --school schools/example.yaml [--target local|cloud] [--layer id] [--ai mock|live|record] [--online] [--approve]
  * 環境変数（.env、コミットしない）: ローカル SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY、クラウド SUPABASE_CLOUD_URL / SUPABASE_CLOUD_SERVICE_ROLE_KEY
  *  - 決定的な取り込み（xlsx/csv）は approved、AI 読み（pdf）は pending で入る（--approve で全部 approved）
  *  - 直前の版との差分を event_changes に保存する
@@ -66,7 +66,7 @@ async function main() {
   }
   console.log(`# target=${target} ${url}`);
   const sb = createClient(url, key, { auth: { persistSession: false }, db: { schema: 'bukatsu' } });
-  const cfg = loadSchoolConfig(arg('school', 'schools/meiden.yaml')!);
+  const cfg = loadSchoolConfig(arg('school', 'schools/example.yaml')!);
   const only = arg('layer');
   const reader = new AiReader({ mode: (arg('ai') as 'mock' | 'live' | 'record' | undefined) ?? undefined });
 

@@ -1,6 +1,6 @@
 /**
  * 使い方:
- *   npm run import -- --school schools/meiden.yaml [--layer club:soccer] [--out out] [--online] [--ai mock|live|record]
+ *   npm run import -- --school schools/example.yaml [--layer club:soccer] [--out out] [--online] [--ai mock|live|record]
  * 出力: out/<school>/<layer>/<版>/events.json, layer.ics, cat/<カテゴリ>.ics, 版が複数なら changes.md
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -26,7 +26,7 @@ function summary(events: ScheduleEvent[]): string {
 }
 
 async function main() {
-  const cfgPath = arg('school', 'schools/meiden.yaml')!;
+  const cfgPath = arg('school', 'schools/example.yaml')!;
   const cfg = loadSchoolConfig(cfgPath);
   const only = arg('layer');
   const outRoot = arg('out', 'out')!;

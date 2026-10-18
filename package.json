@@ -11,7 +11,7 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "tsc -b packages/core packages/importers",
     "import": "tsx packages/importers/src/cli.ts",
-    "web:data": "mkdir -p apps/web/public/data && cp out/meiden/bundle.json apps/web/public/data/meiden.json",
+    "web:data": "mkdir -p apps/web/public/data && cp out/example/bundle.json apps/web/public/data/example.json",
     "web:dev": "npm run dev -w apps/web",
     "load": "tsx packages/importers/src/load.ts"
   },

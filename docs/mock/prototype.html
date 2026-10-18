@@ -271,7 +271,7 @@ const state = {
       {id:'track',name:'陸上部',color:'#1d3f8a',slots:['全体'],source:'sheet',events:TRACK,versions:[{label:'Google シート 10/17 10:00',events:TRACK,status:'approved'}]},
       {id:'soccer',name:'サッカー部',color:'#c0392b',slots:['トップ','サテライト','セカンド','朝練'],source:'pdf',events:SOCCER_V3,versions:[{label:'10月予定 (2)',events:SOCCER_V2,status:'approved'},{label:'10月予定 ③',events:SOCCER_V3,status:'approved'}]},
       {id:'memo',name:'先生のメモ',color:'#7c3aed',slots:['全体'],source:'manual',publishMode:'manual',events:[E('2026-10-25','全体','external','県高体連 評議員会','13:00','県教育会館'),E('2026-10-30','全体','external','県強化合宿（引率）','09:00','知多','15:00','2026-11-01'),Object.assign(E('2026-11-15','全体','event','OB 戦（仮・日程調整中）','10:00','神領'),{draft:true})],versions:[]},
-    ], members:[{name:'前田（ARCA）',email:'maeda@arca.fit',role:'管理者',grants:'すべて'},{name:'サッカー部 顧問',email:'（招待中）',role:'編集',grants:'サッカー部: すべての班'},{name:'陸上部 顧問',email:'（招待中）',role:'編集',grants:'陸上部'}] },
+    ], members:[{name:'管理者（あなた）',email:'you@example.jp',role:'管理者',grants:'すべて'},{name:'サッカー部 顧問',email:'（招待中）',role:'編集',grants:'サッカー部: すべての班'},{name:'陸上部 顧問',email:'（招待中）',role:'編集',grants:'陸上部'}] },
   ],
   ws:null, month:'2026-10', hidden:new Set(), hiddenSlots:new Set(), diffCal:null, versionIdx:{}, panel:null, editing:null, route:'home', showPublicOnly:false,
   shareLinks:[{label:'サッカー部 保護者向け',scope:'サッカー部',token:'3f9a…c21e'}],

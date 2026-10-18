@@ -7,7 +7,7 @@ import { diffVersions, renderChangesMarkdown } from './diff.js';
 import { eventUid } from './uid.js';
 import type { ScheduleEventInput } from './types.js';
 
-const base = { school: 'meiden', layer: 'club:track', layerType: 'club' as const, category: '全体' };
+const base = { school: 'example', layer: 'club:track', layerType: 'club' as const, category: '全体' };
 
 test('parseTimeRange: 業後 / 9時 / 範囲 / までに〜終わり', () => {
   assert.deepEqual(parseTimeRange('業後＠瑞若'), { start: '15:30' });
@@ -123,7 +123,7 @@ test('foldLine は UTF-8 の文字境界で折る', () => {
 });
 
 test('diffVersions: サッカー (2)→③ 型の差分', () => {
-  const soccer = { school: 'meiden', layer: 'club:soccer', layerType: 'club' as const };
+  const soccer = { school: 'example', layer: 'club:soccer', layerType: 'club' as const };
   const v2 = normalize([
     { ...soccer, category: 'セカンド', date: '2026-10-05', kind: 'practice', title: '練習 16:15 バス出発', timeStart: '16:15', place: '神領' },
     { ...soccer, category: 'セカンド', date: '2026-10-07', kind: 'off', title: 'OFF' },
