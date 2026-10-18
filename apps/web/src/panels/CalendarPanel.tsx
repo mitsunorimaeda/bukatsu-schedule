@@ -242,7 +242,7 @@ export function CalendarPanel({
         {kind === 'sheet' && (
           <div className="notice" style={{ display: 'grid', gap: 6 }}>
             <b>Google シート / CSV</b>
-            <SheetSetup schoolId={ws.id} calendarId={existing?.id} value={sheet} onChange={setSheet} />
+            <SheetSetup schoolId={ws.id} calendarId={existing?.id} value={sheet} onChange={setSheet} slots={slots.map((s) => s.name.trim()).filter(Boolean)} />
             {existing && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button className="primary" onClick={importNow} disabled={importing || !sheet}>

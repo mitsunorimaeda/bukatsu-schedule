@@ -214,12 +214,43 @@ table.plain th{color:var(--muted);font-weight:500;font-size:12px}
 .howto-steps textarea{display:block;margin-top:6px}
 .howto-steps textarea{width:100%;font:12px/1.4 ui-monospace,Menlo,monospace;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}
 .choice.soon{opacity:.6;cursor:not-allowed}
-.sheet-preview{overflow:auto;border:1px solid var(--line);border-radius:6px;max-height:200px}
-.sheet-preview table{border-collapse:collapse;font-size:11px;white-space:nowrap}
-.sheet-preview th,.sheet-preview td{border:1px solid var(--line);padding:2px 6px;text-align:left}
-.sheet-preview th{background:var(--head);position:sticky;top:0}
+/* シートの列選び: 役割ごとの色（見出しのプルダウン・表・まとめで共通） */
+:root{--r-date:#d6e4ff;--r-date-s:#2f5fd0;--r-title:#d4f1d9;--r-title-s:#2e8b48;--r-time:#ffe4bf;--r-time-s:#d2781a;--r-place:#e6dcf7;--r-place-s:#7a4fc0;--r-slot:#ffd6e3;--r-slot-s:#c7406f;--r-endDate:#cdeff3;--r-endDate-s:#1f8a9c}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--r-date:#1f3360;--r-date-s:#7fa3ff;--r-title:#1c4328;--r-title-s:#6fd38a;--r-time:#4a3414;--r-time-s:#f0a954;--r-place:#352a52;--r-place-s:#b79cf2;--r-slot:#4d2432;--r-slot-s:#f38bb0;--r-endDate:#163c43;--r-endDate-s:#6fd0e0}}
+:root[data-theme="dark"]{--r-date:#1f3360;--r-date-s:#7fa3ff;--r-title:#1c4328;--r-title-s:#6fd38a;--r-time:#4a3414;--r-time-s:#f0a954;--r-place:#352a52;--r-place-s:#b79cf2;--r-slot:#4d2432;--r-slot-s:#f38bb0;--r-endDate:#163c43;--r-endDate-s:#6fd0e0}
+.sheet-preview{overflow:auto;border:1px solid var(--line);border-radius:6px;max-height:260px;background:var(--paper)}
+.sheet-preview table{border-collapse:separate;border-spacing:0;font-size:11px;white-space:nowrap}
+.sheet-preview th,.sheet-preview td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:2px 6px;text-align:left;background:var(--paper)}
+.sheet-preview th{position:sticky;top:0;z-index:1;vertical-align:top;padding:4px 6px 5px;min-width:88px;box-shadow:inset 0 4px 0 var(--line)}
+.sheet-preview .colhead{display:flex;gap:6px;align-items:baseline;margin-bottom:3px}
+.sheet-preview .colhead b{font-size:12px}
+.sheet-preview .colhead small{color:var(--muted);font-weight:400;overflow:hidden;text-overflow:ellipsis;max-width:90px}
+.sheet-preview .rolepick{width:100%;padding:2px 4px;font-size:11px;border-radius:4px}
+.sheet-preview .slotpick{margin-top:3px;font-weight:400!important;color:var(--fg)!important}
 .sheet-preview tr.head td{color:var(--muted)}
-.sheet-preview .on{background:var(--ink-soft)}
+.sheet-preview .off{color:var(--muted)}
+.sheet-preview th.off .colhead b{color:var(--muted)}
+.sheet-preview .r-date{background:var(--r-date)}.sheet-preview th.r-date{box-shadow:inset 0 4px 0 var(--r-date-s)}.sheet-preview th.r-date .rolepick{border-color:var(--r-date-s);color:var(--r-date-s);font-weight:600}
+.sheet-preview .r-title{background:var(--r-title)}.sheet-preview th.r-title{box-shadow:inset 0 4px 0 var(--r-title-s)}.sheet-preview th.r-title .rolepick{border-color:var(--r-title-s);color:var(--r-title-s);font-weight:600}
+.sheet-preview .r-time{background:var(--r-time)}.sheet-preview th.r-time{box-shadow:inset 0 4px 0 var(--r-time-s)}.sheet-preview th.r-time .rolepick{border-color:var(--r-time-s);color:var(--r-time-s);font-weight:600}
+.sheet-preview .r-place{background:var(--r-place)}.sheet-preview th.r-place{box-shadow:inset 0 4px 0 var(--r-place-s)}.sheet-preview th.r-place .rolepick{border-color:var(--r-place-s);color:var(--r-place-s);font-weight:600}
+.sheet-preview .r-slot{background:var(--r-slot)}.sheet-preview th.r-slot{box-shadow:inset 0 4px 0 var(--r-slot-s)}.sheet-preview th.r-slot .rolepick{border-color:var(--r-slot-s);color:var(--r-slot-s);font-weight:600}
+.sheet-preview .r-endDate{background:var(--r-endDate)}.sheet-preview th.r-endDate{box-shadow:inset 0 4px 0 var(--r-endDate-s)}.sheet-preview th.r-endDate .rolepick{border-color:var(--r-endDate-s);color:var(--r-endDate-s);font-weight:600}
+/* 列の役割のまとめ: 何を・どの列から */
+.rolesum{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:12px}
+.rolesum li{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:baseline;padding:4px 8px;border-radius:6px;background:var(--paper);border-left:4px solid var(--line);min-width:0}
+.rolesum li b{font-size:12px}
+.rolesum li .where{font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rolesum li small{grid-column:1/-1;color:var(--muted);line-height:1.35}
+.rolesum li.off{opacity:.65}
+.rolesum li.missing{border-left-color:var(--red)}.rolesum li.missing .where{color:var(--red);font-weight:600}
+.rolesum li.r-date{border-left-color:var(--r-date-s);background:var(--r-date)}
+.rolesum li.r-title{border-left-color:var(--r-title-s);background:var(--r-title)}
+.rolesum li.r-time{border-left-color:var(--r-time-s);background:var(--r-time)}
+.rolesum li.r-place{border-left-color:var(--r-place-s);background:var(--r-place)}
+.rolesum li.r-slot{border-left-color:var(--r-slot-s);background:var(--r-slot)}
+.rolesum li.r-endDate{border-left-color:var(--r-endDate-s);background:var(--r-endDate)}
+@media (max-width:600px){.rolesum{grid-template-columns:1fr}}
 .history{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
 .history li{display:flex;align-items:center;gap:8px;justify-content:space-between;font-size:12px;border-bottom:1px solid var(--line);padding:3px 0}
 

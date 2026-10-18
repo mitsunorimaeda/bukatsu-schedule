@@ -6,6 +6,7 @@ import { buildIcs, foldLine } from './ics.js';
 import { diffVersions, renderChangesMarkdown } from './diff.js';
 import { eventUid } from './uid.js';
 import { isNationalHolidayEvent, nationalHolidayName, nationalHolidays } from './holidays.js';
+import { sheetRowsToEvents, guessMapping } from './sheet.js';
 import type { ScheduleEventInput } from './types.js';
 
 const base = { school: 'example', layer: 'club:track', layerType: 'club' as const, category: '全体' };
@@ -193,4 +194,44 @@ test('normalize: 国民の祝日は既定で落ち、設定で残せる', () => 
   ];
   assert.deepEqual(normalize(inputs).map((e) => e.title), ['創立記念日', '練習試合']);
   assert.equal(normalize(inputs, { afterSchoolStart: '15:30', defaultDurationMin: 120, fiscalYearStartMonth: 4, skipNationalHolidays: false }).length, 3);
+});
+
+// --- シート: 縦長（班の列あり）と、班ごとに列が分かれた表（日付 × 班）
+const sheetOpts = { school: 'example', layer: 'club:fence', layerType: 'club' as const, slots: ['基本', '別'], fileRef: 'sheet' };
+
+test('シート: 班の列がある縦長の表は、班の列の値で班が決まる', () => {
+  const rows = [
+    ['日付', '内容', '班'],
+    ['2026/10/19', '16:00〜18:00 練習', '基本'],
+    ['2026/10/20', '試合', '基本・別'],
+    ['2026/10/21', '休み', ''],
+  ];
+  const r = sheetRowsToEvents(rows, { ...sheetOpts, mapping: { headerRows: 1, date: 0, title: 1, slot: 2 } });
+  assert.equal(r.events.length, 3);
+  assert.deepEqual(r.events.map((e) => [e.category, e.slots]), [['基本', undefined], ['基本', ['基本', '別']], ['基本', ['基本', '別']]]);
+  assert.equal(r.events[0].timeStart, '16:00');
+});
+
+test('シート: 内容の列が複数（班ごとの列）なら列ごとに 1 件、班は見出しか指定', () => {
+  const rows = [
+    ['日付', '曜', '基本スケジュール', '別スケジュール'],
+    ['2026/10/19', '月', '16:10 練習', ''],
+    ['2026/10/20', '火', '15:10 練習', '中学生練習日'],
+    ['2026/10/21', '水', '', ''],
+  ];
+  const r = sheetRowsToEvents(rows, { ...sheetOpts, slots: ['基本スケジュール', '別スケジュール'], mapping: { headerRows: 1, date: 0, title: 2, titles: [{ col: 2 }, { col: 3 }] } });
+  assert.equal(r.events.length, 3);
+  assert.deepEqual(r.events.map((e) => [e.date, e.category, e.title]), [
+    ['2026-10-19', '基本スケジュール', '16:10 練習'],
+    ['2026-10-20', '基本スケジュール', '15:10 練習'],
+    ['2026-10-20', '別スケジュール', '中学生練習日'],
+  ]);
+  assert.equal(r.skipped, 1);
+  // slot を指定すればその班、'*' なら全班
+  const r2 = sheetRowsToEvents(rows, { ...sheetOpts, slots: ['A', 'B'], mapping: { headerRows: 1, date: 0, title: 2, titles: [{ col: 2, slot: 'A' }, { col: 3, slot: '*' }] } });
+  assert.deepEqual(r2.events.map((e) => [e.category, e.slots]), [['A', undefined], ['A', undefined], ['A', ['A', 'B']]]);
+});
+
+test('シート: 見出しの推測で「スケジュール」も内容の候補', () => {
+  assert.equal(guessMapping(['日付', '曜', '基本スケジュール']).title, 2);
 });

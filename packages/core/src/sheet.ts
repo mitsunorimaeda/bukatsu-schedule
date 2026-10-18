@@ -11,7 +11,13 @@ import { DEFAULT_CLUB_KIND_RULES, DEFAULT_SCHOOL_KIND_RULES, inferKind, normaliz
 export interface SheetMapping {
   /** 0 始まりの列番号 */
   date: number;
+  /** 内容の列（titles を使うときは titles[0].col と同じ） */
   title: number;
+  /**
+   * 班ごとに列が分かれている表（日付 × 班）のための、内容の列の一覧。2 列以上のときだけ入る。
+   * slot はその列の予定を入れる班。省略時は見出し行の文字、'*' なら全班
+   */
+  titles?: { col: number; slot?: string }[];
   time?: number;
   place?: number;
   slot?: number;
@@ -118,7 +124,7 @@ export function guessMapping(header: string[] | undefined): Partial<SheetMapping
   const find = (re: RegExp) => header.findIndex((h) => re.test(normalizeText(h ?? '')));
   const d = find(/日付|^日$|date|月日/i);
   const t = find(/時刻|時間|集合|開始|time/i);
-  const ti = find(/内容|予定|練習|メニュー|種目|件名|タイトル|行事|event|title/i);
+  const ti = find(/内容|予定|練習|メニュー|種目|件名|タイトル|行事|スケジュール|event|title/i);
   const p = find(/場所|会場|place|グラウンド/i);
   const s = find(/^班$|カテゴリ|チーム|対象|グループ|slot/i);
   const e = find(/終了日|最終日|end/i);
@@ -170,7 +176,10 @@ export interface SheetConvertOptions {
   fileRef: string;
 }
 
-/** CSV の行 → 予定。空行・日付の読めない行・内容も時刻も無い行は飛ばす */
+/**
+ * CSV の行 → 予定。空行・日付の読めない行・内容も時刻も無い行は飛ばす。
+ * 内容の列が複数（titles）なら、1 行から列ごとに 1 件ずつ作り、班はその列の slot（省略時は見出しの文字）
+ */
 export function sheetRowsToEvents(rows: string[][], o: SheetConvertOptions): { events: ScheduleEventInput[]; warnings: string[]; skipped: number } {
   const settings = o.settings ?? DEFAULT_SCHOOL_SETTINGS;
   const m = o.mapping;
@@ -179,44 +188,59 @@ export function sheetRowsToEvents(rows: string[][], o: SheetConvertOptions): { e
   const warnings: string[] = [];
   let skipped = 0;
   const cell = (r: string[], i: number | undefined) => (i == null || i < 0 ? '' : normalizeText(r[i] ?? '').trim());
+  const wide = !!m.titles && m.titles.length > 1;
+  const titleCols: { col: number; slot?: string }[] = wide ? m.titles! : [{ col: m.title }];
+  const headerOf = (col: number) => (m.headerRows > 0 ? cell(rows[0] ?? [], col) : '');
+  const rules = o.layerType === 'school' ? DEFAULT_SCHOOL_KIND_RULES : DEFAULT_CLUB_KIND_RULES;
+  const fallback = o.layerType === 'school' ? 'school_event' : o.layerType === 'external' ? 'external_event' : 'practice';
   for (let i = m.headerRows; i < rows.length; i++) {
     const r = rows[i];
     if (!r || r.every((c) => (c ?? '').trim() === '')) continue;
     const date = parseSheetDate(cell(r, m.date), fy);
-    const title0 = cell(r, m.title);
     const timeText = cell(r, m.time);
+    const anyTitle = titleCols.some((tc) => cell(r, tc.col));
     if (!date) {
-      if (title0 || timeText) warnings.push(`${i + 1} 行目: 日付が読めません「${cell(r, m.date)}」`);
+      if (anyTitle || timeText) warnings.push(`${i + 1} 行目: 日付が読めません「${cell(r, m.date)}」`);
       skipped++;
       continue;
     }
-    if (!title0 && !timeText) {
+    if (!anyTitle && !timeText) {
       skipped++;
       continue;
     }
-    // セルが複数行なら、1 行目を件名、残りを備考に（表や ICS で読みやすく。時刻は全文から拾う）
-    const full = title0 || timeText;
-    const lines = full.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
-    const title = lines[0] ?? full;
-    const rest = lines.slice(1).join(' / ') || undefined;
     const place = cell(r, m.place) || undefined;
     const endRaw = cell(r, m.endDate);
     const endDate = endRaw ? parseSheetDate(endRaw, fy) : undefined;
     const slotRaw = cell(r, m.slot);
-    const cats = slotRaw ? slotRaw.split(/[・,、/／]/).map((s) => s.trim()).filter(Boolean) : o.slots;
-    const rules = o.layerType === 'school' ? DEFAULT_SCHOOL_KIND_RULES : DEFAULT_CLUB_KIND_RULES;
-    const fallback = o.layerType === 'school' ? 'school_event' : o.layerType === 'external' ? 'external_event' : 'practice';
-    const kind = inferKind(`${full} ${timeText}`, rules, fallback);
-    // 時刻: 時刻の列 → 内容の中 の順。「業後」「放課後」は設定の開始時刻
-    let t = parseTimeRange(timeText || full, settings);
-    if (!t.start && /業後|放課後/.test(`${timeText} ${title}`)) t = { start: settings.afterSchoolStart };
-    const timed = !['off', 'self', 'pause:test', 'pause:holiday', 'exam', 'holiday', 'no_class', 'class'].includes(kind);
-    const base = { school: o.school, layer: o.layer, layerType: o.layerType, date, endDate: endDate && endDate > date ? endDate : undefined, kind, title, place, sourceRef: `${o.fileRef}#${i + 1}` } as const;
-    // 班の列があって複数の班なら 1 件にまとめる（表で横結合、配信は班ごと）
-    const known = cats.filter((c) => o.slots.includes(c));
-    const list = known.length ? known : cats;
-    const noteParts = [rest, timeText && timeText !== full && !t.start ? timeText : undefined].filter(Boolean) as string[];
-    events.push({ ...base, category: list[0], slots: list.length > 1 ? list : undefined, timeStart: timed ? t.start : undefined, timeEnd: timed ? t.end : undefined, note: noteParts.length ? noteParts.join(' / ') : undefined });
+    let made = 0;
+    for (const tc of titleCols) {
+      const title0 = cell(r, tc.col);
+      // 班ごとの列では、空の列はその班に予定なし。1 列だけなら時刻だけの行も予定にする
+      if (!title0 && (wide || !timeText)) continue;
+      // セルが複数行なら、1 行目を件名、残りを備考に（表や ICS で読みやすく。時刻は全文から拾う）
+      const full = title0 || timeText;
+      const lines = full.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+      const title = lines[0] ?? full;
+      const rest = lines.slice(1).join(' / ') || undefined;
+      let cats: string[];
+      if (wide) {
+        const s = tc.slot ?? headerOf(tc.col);
+        cats = s === '*' || !s ? o.slots : [s];
+      } else cats = slotRaw ? slotRaw.split(/[・,、/／]/).map((x) => x.trim()).filter(Boolean) : o.slots;
+      const kind = inferKind(`${full} ${timeText}`, rules, fallback);
+      // 時刻: 時刻の列 → 内容の中 の順。「業後」「放課後」は設定の開始時刻
+      let t = parseTimeRange(timeText || full, settings);
+      if (!t.start && /業後|放課後/.test(`${timeText} ${title}`)) t = { start: settings.afterSchoolStart };
+      const timed = !['off', 'self', 'pause:test', 'pause:holiday', 'exam', 'holiday', 'no_class', 'class'].includes(kind);
+      const base = { school: o.school, layer: o.layer, layerType: o.layerType, date, endDate: endDate && endDate > date ? endDate : undefined, kind, title, place, sourceRef: `${o.fileRef}#${i + 1}${wide ? `:${tc.col + 1}` : ''}` } as const;
+      // 班の列があって複数の班なら 1 件にまとめる（表で横結合、配信は班ごと）
+      const known = cats.filter((c) => o.slots.includes(c));
+      const list = known.length ? known : cats;
+      const noteParts = [rest, timeText && timeText !== full && !t.start ? timeText : undefined].filter(Boolean) as string[];
+      events.push({ ...base, category: list[0], slots: list.length > 1 ? list : undefined, timeStart: timed ? t.start : undefined, timeEnd: timed ? t.end : undefined, note: noteParts.length ? noteParts.join(' / ') : undefined });
+      made++;
+    }
+    if (!made) skipped++;
   }
   return { events, warnings, skipped };
 }
