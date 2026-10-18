@@ -7,7 +7,7 @@ AI の鍵（Anthropic の API キー）は**無くても使えます**。鍵が�
 ## 1. Supabase
 
 1. https://supabase.com でプロジェクトを作る（リージョンは Tokyo）。
-2. SQL Editor で `supabase/migrations/` の 3 ファイルを日付順に実行する。専用スキーマ `bukatsu` だけを作ります（既存の `public` には触れません）。
+2. SQL Editor で `supabase/migrations/` の全ファイルをファイル名の日付順に実行する（1 つにつなげて 1 回で流してもよい）。専用スキーマ `bukatsu` だけを作ります（既存の `public` には触れません）。
 3. PostgREST に `bukatsu` スキーマを公開する。SQL Editor で:
    ```sql
    alter role authenticator set pgrst.db_schemas = 'public, graphql_public, bukatsu';
