@@ -1,3 +1,4 @@
+import { nationalHolidayName } from '@bukatsu/core/browser';
 import { useLayoutEffect, useRef } from 'react';
 import { WEEKDAYS, covers, datesBetween, dayIndex, md, rowCells, spanPart, weekday, type Calendar, type UiEvent } from '../model';
 
@@ -50,11 +51,13 @@ function chunkByHeight(days: string[], availH: number, cals: PdfCal[], base: num
 }
 
 function DayCell({ d, showMonth }: { d: string; showMonth: boolean }) {
+  const hol = nationalHolidayName(d);
   return (
     <td className="d">
       {showMonth && <span className="mon">{Number(d.slice(5, 7))}月</span>}
       <b>{Number(d.slice(8, 10))}</b>
       <span>{WEEKDAYS[weekday(d)]}</span>
+      {hol && <span className="hol">{hol}</span>}
     </td>
   );
 }
@@ -149,7 +152,7 @@ export function PdfPages({ wsName, cals, from, to, layout, paper, versionsNote }
                       .map((e) => {
                         const p = spanPart(e, d);
                         const row = (
-                          <tr key={`${d}-${e.uid}`} className={weekday(d) === 0 ? 'sun' : weekday(d) === 6 ? 'sat' : ''}>
+                          <tr key={`${d}-${e.uid}`} className={weekday(d) === 0 || nationalHolidayName(d) ? 'sun' : weekday(d) === 6 ? 'sat' : ''}>
                             {first ? <DayCell d={d} showMonth={d.endsWith('-01') || d === ds[0]} /> : <td className="d" />}
                             <td>{c.cal.name}</td>
                             <td>{e.slots.length === c.cal.slots.length && c.cal.slots.length > 1 ? '全班' : e.slots.join('・')}</td>
@@ -195,7 +198,7 @@ export function PdfPages({ wsName, cals, from, to, layout, paper, versionsNote }
               </thead>
               <tbody>
                 {ds.map((d, i) => (
-                  <tr key={d} className={weekday(d) === 0 ? 'sun' : weekday(d) === 6 ? 'sat' : ''} style={{ height: base }}>
+                  <tr key={d} className={weekday(d) === 0 || nationalHolidayName(d) ? 'sun' : weekday(d) === 6 ? 'sat' : ''} style={{ height: base }}>
                     <DayCell d={d} showMonth={i === 0 || d.endsWith('-01')} />
                     {cals.map((c) =>
                       rowCells(d, c.slots, c.events).map((cell) => (

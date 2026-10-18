@@ -1,3 +1,4 @@
+import { nationalHolidaysInMonth } from '@bukatsu/core/browser';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { deleteEvent, loadByToken, loadWorkspace, saveEvent, signOut } from './api';
 import { CellEditor } from './CellEditor';
@@ -100,10 +101,11 @@ export function WorkspaceView({ id, token, email, startTour, onBack }: { id?: st
     [visible, hiddenSlots, publicOnly, readOnly, diffCal, ws],
   );
   const holidays = useMemo(() => {
-    const s = new Set<string>();
+    // 国民の祝日は表から計算（取り込んでいなくても赤くなる）。学校独自の休日（創立記念日など）は取り込んだ予定から
+    const s = new Set<string>(nationalHolidaysInMonth(month).keys());
     for (const c of columns) for (const e of c.events) if (e.kind === 'holiday') s.add(e.date);
     return s;
-  }, [columns]);
+  }, [columns, month]);
 
   if (err) return <div style={{ padding: 20 }}>{err}</div>;
   if (!ws) return <div style={{ padding: 20 }}>読み込み中…</div>;

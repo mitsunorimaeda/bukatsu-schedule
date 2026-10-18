@@ -2,6 +2,7 @@
 import { createClient, type Session } from '@supabase/supabase-js';
 import { DEFAULT_SCHOOL_SETTINGS } from '@bukatsu/core/browser';
 import type { LayerType, SchoolSettings } from '@bukatsu/core/browser';
+import { isNationalHolidayEvent } from '@bukatsu/core/browser';
 import { diffEvents, type Calendar, type UiEvent, type Version, type Workspace } from './model';
 
 function makeClient(url: string, key: string) {
@@ -199,8 +200,13 @@ export async function loadWorkspace(id: string): Promise<Workspace> {
   const ids = wanted.map((v) => v.id);
   const { data: rows, error: e4 } = ids.length ? await sb.from('events').select('*').in('version_id', ids).order('date') : { data: [], error: null };
   if (e4) fail('予定を読めませんでした', e4);
+  const settings: SchoolSettings = { ...DEFAULT_SCHOOL_SETTINGS, ...(school.settings as Partial<SchoolSettings>) };
   const byVersion = new Map<string, UiEvent[]>();
-  for (const r of (rows ?? []) as EventRow[]) (byVersion.get(r.version_id) ?? byVersion.set(r.version_id, []).get(r.version_id)!).push(toEvent(r));
+  for (const r of (rows ?? []) as EventRow[]) {
+    // 設定で祝日を取り込まないなら、以前に取り込まれていた祝日も見せない（次の取り込みで消える）
+    if (settings.skipNationalHolidays !== false && isNationalHolidayEvent({ date: r.date, endDate: r.end_date ?? undefined, title: r.title })) continue;
+    (byVersion.get(r.version_id) ?? byVersion.set(r.version_id, []).get(r.version_id)!).push(toEvent(r));
+  }
   const evs = (v?: VersionRow) => (v ? byVersion.get(v.id) ?? [] : []);
 
   const calendars: Calendar[] = ((layers ?? []) as LayerRow[]).map((l) => {
@@ -236,11 +242,17 @@ export async function loadWorkspace(id: string): Promise<Workspace> {
   return {
     id: school.id,
     name: school.name,
-    settings: { ...DEFAULT_SCHOOL_SETTINGS, ...(school.settings as Partial<SchoolSettings>) },
+    settings,
     calendars,
     role: (mem?.role as Workspace['role'] | undefined) ?? 'viewer',
     grants: g,
   };
+}
+
+/** 予定表（学校）の設定を保存する。管理者のみ */
+export async function saveSchoolSettings(schoolId: string, settings: SchoolSettings): Promise<void> {
+  const { error } = await must().from('schools').update({ settings }).eq('id', schoolId);
+  if (error) fail('設定を保存できませんでした', error);
 }
 
 // ---------- カレンダー ----------
@@ -407,6 +419,8 @@ export async function loadByToken(token: string): Promise<Workspace> {
   if (!rows.length) throw new Error('このリンクは無効か、取り消されたか、まだ公開された予定がありません');
   const cals = new Map<string, Calendar>();
   for (const r of rows) {
+    // 閲覧リンクでは学校の設定が読めないので、既定どおり国民の祝日は出さない
+    if (isNationalHolidayEvent({ date: r.date, endDate: r.end_date ?? undefined, title: r.title })) continue;
     const c =
       cals.get(r.layer_id) ??
       cals.set(r.layer_id, { id: r.layer_id, name: r.layer_name, color: r.layer_color ?? '#888', type: r.layer_type, slots: r.layer_slots?.length ? r.layer_slots : ['全体'], publishMode: 'auto', source: null, versions: [], events: [], published: [] }).get(r.layer_id)!;

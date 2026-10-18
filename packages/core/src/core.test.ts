@@ -5,6 +5,7 @@ import { mergeSpans, expandSpans } from './merge.js';
 import { buildIcs, foldLine } from './ics.js';
 import { diffVersions, renderChangesMarkdown } from './diff.js';
 import { eventUid } from './uid.js';
+import { isNationalHolidayEvent, nationalHolidayName, nationalHolidays } from './holidays.js';
 import type { ScheduleEventInput } from './types.js';
 
 const base = { school: 'example', layer: 'club:track', layerType: 'club' as const, category: '全体' };
@@ -144,4 +145,52 @@ test('diffVersions: サッカー (2)→③ 型の差分', () => {
   const md = renderChangesMarkdown(changes);
   assert.match(md, /【トップ】/);
   assert.match(md, /10\/21 練習 15:15 バス出発 15:15〜17:15｜神領 → 練習 16:15 バス出発 16:15〜18:15｜神領/);
+});
+
+test('nationalHolidays: 2026 年の祝日（振替休日・国民の休日を含む）', () => {
+  const h = nationalHolidays(2026);
+  assert.deepEqual(
+    [...h.entries()].sort(),
+    [
+      ['2026-01-01', '元日'], ['2026-01-12', '成人の日'], ['2026-02-11', '建国記念の日'], ['2026-02-23', '天皇誕生日'], ['2026-03-20', '春分の日'],
+      ['2026-04-29', '昭和の日'], ['2026-05-03', '憲法記念日'], ['2026-05-04', 'みどりの日'], ['2026-05-05', 'こどもの日'], ['2026-05-06', '振替休日'],
+      ['2026-07-20', '海の日'], ['2026-08-11', '山の日'], ['2026-09-21', '敬老の日'], ['2026-09-22', '国民の休日'], ['2026-09-23', '秋分の日'],
+      ['2026-10-12', 'スポーツの日'], ['2026-11-03', '文化の日'], ['2026-11-23', '勤労感謝の日'],
+    ],
+  );
+  // 2027: 春分 3/21（日）→ 振替 3/22、秋分 9/23、敬老 9/20（国民の休日なし）
+  assert.equal(nationalHolidayName('2027-03-22'), '振替休日');
+  assert.equal(nationalHolidayName('2027-09-23'), '秋分の日');
+  assert.equal(nationalHolidayName('2027-09-22'), undefined);
+  assert.equal(nationalHolidayName('2026-10-18'), undefined);
+});
+
+test('isNationalHolidayEvent: 祝日そのものだけ true', () => {
+  assert.equal(isNationalHolidayEvent({ date: '2026-07-20', title: '海の日' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-07-20', title: '海の日（祝）' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-07-20', title: '祝日' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-05-06', title: '振替休日' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-09-23', title: '秋分' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-10-12', title: 'スポーツの日' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-10-12', title: 'スポーツの日・休校' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-11-03', title: '文化の日 休校' }), true);
+  assert.equal(isNationalHolidayEvent({ date: '2026-05-03', endDate: '2026-05-05', title: '祝日' }), true);
+  // 祝日の日の別の予定は残す
+  assert.equal(isNationalHolidayEvent({ date: '2026-11-03', title: '文化祭' }), false);
+  assert.equal(isNationalHolidayEvent({ date: '2026-07-20', title: '練習試合 vs 〇〇' }), false);
+  assert.equal(isNationalHolidayEvent({ date: '2026-07-20', title: '海の日 練習 9:00' }), false);
+  // 祝日でない日の「休日」や学校独自の休みは残す
+  assert.equal(isNationalHolidayEvent({ date: '2026-07-21', title: '休日' }), false);
+  assert.equal(isNationalHolidayEvent({ date: '2026-06-01', title: '創立記念日' }), false);
+  assert.equal(isNationalHolidayEvent({ date: '2026-05-01', endDate: '2026-05-06', title: '休み' }), false);
+});
+
+test('normalize: 国民の祝日は既定で落ち、設定で残せる', () => {
+  const inputs: ScheduleEventInput[] = [
+    { ...base, date: '2026-07-20', kind: 'holiday', title: '海の日' },
+    { ...base, date: '2026-07-20', kind: 'match', title: '練習試合', timeStart: '09:00' },
+    { ...base, date: '2026-06-01', kind: 'holiday', title: '創立記念日' },
+  ];
+  assert.deepEqual(normalize(inputs).map((e) => e.title), ['創立記念日', '練習試合']);
+  assert.equal(normalize(inputs, { afterSchoolStart: '15:30', defaultDurationMin: 120, fiscalYearStartMonth: 4, skipNationalHolidays: false }).length, 3);
 });

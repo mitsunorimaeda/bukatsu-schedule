@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CLUB_TABLE_PROMPT, READ_LAYOUTS, READ_PLACES, READ_SUBJECTS, SCHOOL_CALENDAR_PROMPT, clubTableToEvents, manualPrompt, mergeSpans, normalize, parseManualResult, readOptionsToVars, schoolItemsToEvents } from '@bukatsu/core/browser';
 import type { ReadLayout, ReadOptions, ReadPlace } from '@bukatsu/core/browser';
-import { createPendingVersion, saveCalendar, supabase } from '../api';
+import { createPendingVersion, saveCalendar, saveSchoolSettings, supabase } from '../api';
 import type { Calendar, Workspace } from '../model';
 import { Panel, useToast } from '../ui';
 
@@ -123,6 +123,7 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
   const [progress, setProgress] = useState(0);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState<string>();
+  const [savingHol, setSavingHol] = useState(false);
   const [pasted, setPasted] = useState('');
   const [copied, setCopied] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -293,6 +294,26 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
           </div>
 
           {cal && <ReadQuestions key={cal.id} ro={ro} onChange={setRo} slots={cal.slots} />}
+          <label className="checkline" title={ws.role === 'admin' ? '' : '管理者だけが変えられます'}>
+            <input
+              type="checkbox"
+              checked={ws.settings.skipNationalHolidays !== false}
+              disabled={ws.role !== 'admin' || savingHol}
+              onChange={async (e) => {
+                setSavingHol(true);
+                try {
+                  await saveSchoolSettings(ws.id, { ...ws.settings, skipNationalHolidays: e.target.checked });
+                  await onDone();
+                } catch (x) {
+                  setErr((x as Error).message);
+                } finally {
+                  setSavingHol(false);
+                }
+              }}
+            />
+            国民の祝日は取り込まない
+            <small>「海の日」「祝日」だけのマスは飛ばします。スマホのカレンダーの祝日と重なるため。祝日の日の練習や行事は残ります</small>
+          </label>
 
           {mode === 'api' && (
             <>

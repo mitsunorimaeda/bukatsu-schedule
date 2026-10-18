@@ -231,3 +231,9 @@ table.plain th{color:var(--muted);font-weight:500;font-size:12px}
 .readq-grid label.wide{grid-column:1/-1}
 .readq-grid select,.readq-grid input{width:100%;min-width:0}
 @media (max-width:560px){.readq-grid{grid-template-columns:1fr}}
+
+/* 祝日の名前（PDF の日付欄）と設定のチェック行 */
+.page td.d .hol{display:block;font-size:8px;color:#b33;line-height:1.1;margin-left:0}
+.form label.checkline{display:grid;grid-template-columns:auto 1fr;column-gap:8px;row-gap:2px;align-items:start;margin:8px 0;font-size:13px;line-height:1.4;color:var(--fg)}
+.form label.checkline input{margin-top:3px;grid-row:1 / span 2}
+.form label.checkline small{display:block;color:var(--muted);font-size:11.5px;grid-column:2}

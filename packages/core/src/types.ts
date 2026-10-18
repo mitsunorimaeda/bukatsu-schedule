@@ -111,12 +111,15 @@ export interface SchoolSettings {
   defaultDurationMin: number;
   /** 年度の開始月。既定 4 */
   fiscalYearStartMonth: number;
+  /** 国民の祝日そのもの（「海の日」「祝日」だけの予定）は取り込まない。スマホのカレンダーの祝日と重なるため。既定 true */
+  skipNationalHolidays?: boolean;
 }
 
 export const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
   afterSchoolStart: '15:30',
   defaultDurationMin: 120,
   fiscalYearStartMonth: 4,
+  skipNationalHolidays: true,
 };
 
 /** 版（取り込み 1 回分） */

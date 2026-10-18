@@ -1,6 +1,7 @@
 import { ALLDAY_KINDS, DEFAULT_SCHOOL_SETTINGS } from './types.js';
 import type { Kind, ScheduleEvent, ScheduleEventInput, SchoolSettings } from './types.js';
 import { eventUid } from './uid.js';
+import { isNationalHolidayEvent } from './holidays.js';
 
 /** 種類の判定語。学校ごとの設定で上書きできる */
 export interface KindRule {
@@ -96,6 +97,7 @@ export function parsePlace(text: string): string | undefined {
  *  - 終日種類は時刻を落とす
  *  - 時刻ありで終了不明なら既定時間を足す
  *  - 同じ (layer, category, date, kind) が複数あれば seq で uid を分ける
+ *  - 国民の祝日そのもの（「海の日」「祝日」だけの予定）は落とす（settings.skipNationalHolidays が false なら残す）
  */
 export function normalize(inputs: ScheduleEventInput[], settings: SchoolSettings = DEFAULT_SCHOOL_SETTINGS): ScheduleEvent[] {
   const seqCount = new Map<string, number>();
@@ -107,6 +109,7 @@ export function normalize(inputs: ScheduleEventInput[], settings: SchoolSettings
     if (e.place) e.place = normalizeText(e.place) || undefined;
     if (e.note) e.note = e.note.normalize('NFKC').replace(/[ \t]+/g, ' ').trim() || undefined;
     e.category = e.category?.trim() || '全体';
+    if (settings.skipNationalHolidays !== false && isNationalHolidayEvent(e)) continue;
     if (ALLDAY_KINDS.has(e.kind)) {
       delete e.timeStart;
       delete e.timeEnd;

@@ -2,6 +2,7 @@
 export * from './types.js';
 export * from './uid.js';
 export * from './normalize.js';
+export * from './holidays.js';
 export * from './merge.js';
 export * from './ics.js';
 export * from './diff.js';
