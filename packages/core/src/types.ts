@@ -113,6 +113,8 @@ export interface SchoolSettings {
   fiscalYearStartMonth: number;
   /** 国民の祝日そのもの（「海の日」「祝日」だけの予定）は取り込まない。スマホのカレンダーの祝日と重なるため。既定 true */
   skipNationalHolidays?: boolean;
+  /** AI 読み取り（このアプリに読ませる）の月の上限（円、日本時間の月初から）。0 なら使わせない。既定 1000 */
+  aiMonthlyYen?: number;
 }
 
 export const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
@@ -120,7 +122,21 @@ export const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
   defaultDurationMin: 120,
   fiscalYearStartMonth: 4,
   skipNationalHolidays: true,
+  aiMonthlyYen: 1000,
 };
+
+/** AI 読み取りの料金の目安（円）。1 ドル 150 円。料金は 100 万トークンあたりのドル（入力, 出力） */
+const AI_PRICE_USD: Record<string, [number, number]> = { 'claude-sonnet-5-5': [2, 10], 'claude-haiku-4-5': [1, 5] };
+export function aiCostYen(model: string, inputTokens: number, outputTokens: number): number {
+  const key = Object.keys(AI_PRICE_USD).find((k) => model.startsWith(k));
+  const [i, o] = key ? AI_PRICE_USD[key] : [2, 10];
+  return Math.round(((inputTokens * i + outputTokens * o) / 1_000_000) * 150 * 100) / 100;
+}
+/** 日本時間の今月の初め（UTC の ISO） */
+export function jstMonthStart(now = new Date()): string {
+  const j = new Date(now.getTime() + 9 * 3600_000);
+  return new Date(Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), 1) - 9 * 3600_000).toISOString();
+}
 
 /** 版（取り込み 1 回分） */
 export interface SourceVersion {

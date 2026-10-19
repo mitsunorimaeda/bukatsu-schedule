@@ -1,6 +1,6 @@
 /** Supabase（bukatsu スキーマ）とのやり取り。画面はこのファイルの関数だけを呼ぶ */
 import { createClient, type Session } from '@supabase/supabase-js';
-import { DEFAULT_SCHOOL_SETTINGS } from '@bukatsu/core/browser';
+import { DEFAULT_SCHOOL_SETTINGS, jstMonthStart } from '@bukatsu/core/browser';
 import type { LayerType, SchoolSettings } from '@bukatsu/core/browser';
 import { isNationalHolidayEvent } from '@bukatsu/core/browser';
 import { diffEvents, type Calendar, type UiEvent, type Version, type Workspace } from './model';
@@ -250,6 +250,12 @@ export async function loadWorkspace(id: string): Promise<Workspace> {
 }
 
 /** 予定表（学校）の設定を保存する。管理者のみ */
+/** 今月（日本時間）の AI 読み取りの使用額（円の目安） */
+export async function loadAiUsageYen(schoolId: string): Promise<number> {
+  const { data, error } = await must().from('ai_usage').select('cost_yen').eq('school_id', schoolId).gte('at', jstMonthStart());
+  if (error) fail('AI の使用額を読めませんでした', error);
+  return ((data ?? []) as { cost_yen: number | string }[]).reduce((a, r) => a + Number(r.cost_yen), 0);
+}
 export async function saveSchoolSettings(schoolId: string, settings: SchoolSettings): Promise<void> {
   const { error } = await must().from('schools').update({ settings }).eq('id', schoolId);
   if (error) fail('設定を保存できませんでした', error);

@@ -69,6 +69,16 @@ service_role キーを置く前でも、ログイン・入力・共有リンク�
 
 `supabase start` でローカルの Supabase を立て（`supabase/config.toml` はポート 5434x）、`apps/web/.env.local` に `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` を書いて `npm run web:dev`。取り込み API をローカルで動かすには `apps/web/.dev.vars` に上の secret を書き、`npx wrangler pages dev public --port 8788` を別に起動します（Vite が `/api` と `/ics` をそこへ中継します）。
 
+## 画面の通し確認（配信前）
+
+ローカル Supabase が動いている状態で `npm run e2e`。ログイン → 予定表とカレンダーの作成 → 予定の入力（公開・下書き）→ 閲覧リンク → ICS → PDF（印刷画面）→ 取り込み（貼り付け）と反映 → AI 読み取りの上限 → 自動更新の警告 → カレンダーの削除、を Chrome で通します。テスト用の利用者は毎回作って最後に消します。`apps/web/.dev.vars` の `SUPABASE_URL` がローカル（127.0.0.1）でなければ動きません。AI の鍵は偽物に差し替えるので料金はかかりません。
+
+`scripts/deploy.sh` は 型チェック → 計算部分のテスト → 画面の通し確認 → ビルド → 配信 の順で、どれかが失敗したら配信しません（`PAGES_PROJECT` で配信先を変えられます）。
+
+## AI 読み取りの上限
+
+「このアプリに読ませる」は学校ごとに月の上限があります（既定 1,000 円、日本時間の月初から）。管理者が取り込み画面で変えられます（0 で使わない）。使った額は `bukatsu.ai_usage` に 1 回ずつ記録され、上限に達するとサーバーは Claude を呼ばずに断ります。金額は 1 ドル 150 円で計算した目安です。
+
 ## データの扱い
 
 [data-handling.md](data-handling.md) に、何をどこに保存し、誰が見られ、AI に何を送るかをまとめています。自分で立てた場合は「運営」があなたになります。

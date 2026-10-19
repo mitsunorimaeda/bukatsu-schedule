@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DEFAULT_SCHOOL_SETTINGS } from '@bukatsu/core/browser';
 import { CLUB_TABLE_PROMPT, READ_LAYOUTS, READ_PLACES, READ_SUBJECTS, SCHOOL_CALENDAR_PROMPT, clubTableToEvents, manualPrompt, mergeSpans, normalize, parseManualResult, readOptionsToVars, schoolItemsToEvents } from '@bukatsu/core/browser';
 import type { ReadLayout, ReadOptions, ReadPlace } from '@bukatsu/core/browser';
-import { createPendingVersion, saveCalendar, saveSchoolSettings, supabase } from '../api';
+import { createPendingVersion, loadAiUsageYen, saveCalendar, saveSchoolSettings, supabase } from '../api';
 import type { Calendar, Workspace } from '../model';
 import { Panel, useToast } from '../ui';
 
@@ -140,6 +141,25 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
   useEffect(() => {
     if (aiConfigured === false) setMode('manual');
   }, [aiConfigured]);
+  // 今月の AI 読み取りの使用額と上限（学校の設定）
+  const limitYen = ws.settings.aiMonthlyYen ?? DEFAULT_SCHOOL_SETTINGS.aiMonthlyYen ?? 1000;
+  const [usedYen, setUsedYen] = useState<number | null>(null);
+  const [limitDraft, setLimitDraft] = useState(String(limitYen));
+  useEffect(() => {
+    if (aiConfigured) loadAiUsageYen(ws.id).then(setUsedYen).catch(() => setUsedYen(null));
+  }, [aiConfigured, ws.id]);
+  const overLimit = usedYen != null && usedYen >= limitYen;
+  const saveLimit = async () => {
+    const v = Math.max(0, Math.round(Number(limitDraft)));
+    if (!Number.isFinite(v) || v === limitYen) return setLimitDraft(String(limitYen));
+    try {
+      await saveSchoolSettings(ws.id, { ...ws.settings, aiMonthlyYen: v });
+      await onDone();
+      toast(`AI 読み取りの上限を月 ${v} 円にしました`);
+    } catch (x) {
+      setErr((x as Error).message);
+    }
+  };
   const pickMode = (m: Mode) => {
     setMode(m);
     setErr(undefined);
@@ -217,11 +237,13 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
       if (!res.ok || body.error) throw new Error(body.error ?? `HTTP ${res.status}`);
       setProgress(100);
       setResult(body);
+      loadAiUsageYen(ws.id).then(setUsedYen).catch(() => undefined);
       setStep(3);
       await onDone();
     } catch (e) {
       setErr((e as Error).message);
       setStep(1);
+      loadAiUsageYen(ws.id).then(setUsedYen).catch(() => undefined);
     } finally {
       clearInterval(timer);
     }
@@ -342,8 +364,20 @@ export function ImportPanel({ ws, calId, onClose, onDone }: { ws: Workspace; cal
               <p className="hint">
                 ファイルは読み取りのためだけに Anthropic の Claude API に送られ、保存されません。生徒の氏名は取り込みません。
               </p>
+              <div className={`aiquota${overLimit ? ' over' : usedYen != null && usedYen >= limitYen * 0.8 ? ' near' : ''}`}>
+                <span>
+                  今月の AI 読み取り: <b>約 {usedYen == null ? '…' : Math.round(usedYen).toLocaleString()} 円</b> / 上限 {limitYen.toLocaleString()} 円
+                </span>
+                {ws.role === 'admin' && (
+                  <label>
+                    上限
+                    <input type="number" min={0} step={100} value={limitDraft} onChange={(e) => setLimitDraft(e.target.value)} onBlur={saveLimit} onKeyDown={(e) => e.key === 'Enter' && saveLimit()} />円/月
+                  </label>
+                )}
+                {overLimit && <small>今月の上限に達しました。{ws.role === 'admin' ? '上限を上げるか、' : '管理者に上限を上げてもらうか、'}「自分の AI に読ませて貼り付ける」を使ってください。</small>}
+              </div>
               {err && <div className="error">{err}</div>}
-              <button className="primary" disabled={!file || !cal} onClick={startApi}>
+              <button className="primary" disabled={!file || !cal || overLimit} onClick={startApi}>
                 読み取りを始める
               </button>
             </>

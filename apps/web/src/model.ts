@@ -284,3 +284,21 @@ export function slugify(name: string): string {
   const rnd = Math.random().toString(36).slice(2, 6);
   return (base ? `${base}-${rnd}` : `ws-${Date.now().toString(36)}`).slice(0, 40);
 }
+
+/** シートの自動更新の警告: 失敗している、または一定時間（既定 3 時間）以上確かめに行っていない（定期実行が止まっている） */
+export interface SyncAlert {
+  cal: Calendar;
+  kind: 'error' | 'stale';
+  message: string;
+  at?: string;
+}
+export function syncAlerts(calendars: Calendar[], now = Date.now(), staleHours = 3): SyncAlert[] {
+  const out: SyncAlert[] = [];
+  for (const c of calendars) {
+    const src = c.source as { kind?: string; auto?: string; lastSync?: string; lastError?: string | null } | null;
+    if (!src || src.kind !== 'sheet' || src.auto === 'off') continue;
+    if (src.lastError) out.push({ cal: c, kind: 'error', message: src.lastError, at: src.lastSync });
+    else if (src.lastSync && now - new Date(src.lastSync).getTime() > staleHours * 3600_000) out.push({ cal: c, kind: 'stale', message: `${staleHours} 時間以上、シートを確かめに行けていません。自動更新が止まっている可能性があります`, at: src.lastSync });
+  }
+  return out;
+}

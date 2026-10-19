@@ -5,7 +5,7 @@
  * 流れ: 権限確認（ユーザーの JWT で can_edit）→ Claude で読み取り（構造化出力）→ 「確認待ち」の版として保存（service role）
  * Claude の鍵と service role はここ（サーバー側）にだけ置く。
  */
-import { CLUB_TABLE_PROMPT, SCHOOL_CALENDAR_PROMPT, clubTableToEvents, mergeSpans, normalize, schoolItemsToEvents, strictSchema } from '../../../../packages/core/src/browser';
+import { CLUB_TABLE_PROMPT, DEFAULT_SCHOOL_SETTINGS, SCHOOL_CALENDAR_PROMPT, aiCostYen, clubTableToEvents, jstMonthStart, mergeSpans, normalize, schoolItemsToEvents, strictSchema } from '../../../../packages/core/src/browser';
 import type { ClubTableResult, Prompt, ScheduleEvent, SchoolCalendarResult } from '../../../../packages/core/src/browser';
 
 interface Env {
@@ -23,11 +23,28 @@ async function sb(env: Env, path: string, init: RequestInit & { token?: string; 
   return fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { ...init, headers });
 }
 
+/** JWT の sub（利用者の id）。署名の確認は can_edit（Supabase）で済んでいる */
+function jwtSub(jwt: string): string | null {
+  try {
+    const p = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return (JSON.parse(atob(p + '==='.slice((p.length + 3) % 4))) as { sub?: string }).sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function base64(bytes: ArrayBuffer): string {
   const u = new Uint8Array(bytes);
   let s = '';
   for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
   return btoa(s);
+}
+
+/** 読み取りに失敗しても、使ったトークンは記録したいので添えて投げる */
+class ReadError extends Error {
+  constructor(message: string, public model?: string, public usage?: { input: number; output: number }) {
+    super(message);
+  }
 }
 
 async function readWithClaude<T>(env: Env, prompt: Prompt<T>, file: File, variables: Record<string, string>): Promise<{ json: T; model: string; usage: { input: number; output: number } }> {
@@ -48,11 +65,16 @@ async function readWithClaude<T>(env: Env, prompt: Prompt<T>, file: File, variab
   });
   if (!res.ok) throw new Error(`Claude API ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const msg = (await res.json()) as { model: string; stop_reason: string; content: { type: string; text?: string }[]; usage: { input_tokens: number; output_tokens: number } };
-  if (msg.stop_reason === 'refusal') throw new Error('モデルが読み取りを拒否しました');
-  if (msg.stop_reason === 'max_tokens') throw new Error('出力が長すぎました。ページを分けてください');
+  const usage = { input: msg.usage.input_tokens, output: msg.usage.output_tokens };
+  if (msg.stop_reason === 'refusal') throw new ReadError('モデルが読み取りを拒否しました', msg.model, usage);
+  if (msg.stop_reason === 'max_tokens') throw new ReadError('出力が長すぎました。ページを分けてください', msg.model, usage);
   const text = msg.content.find((c) => c.type === 'text')?.text;
-  if (!text) throw new Error('構造化出力が返りませんでした');
-  return { json: JSON.parse(text) as T, model: msg.model, usage: { input: msg.usage.input_tokens, output: msg.usage.output_tokens } };
+  if (!text) throw new ReadError('構造化出力が返りませんでした', msg.model, usage);
+  try {
+    return { json: JSON.parse(text) as T, model: msg.model, usage };
+  } catch {
+    throw new ReadError('読み取り結果を解釈できませんでした', msg.model, usage);
+  }
 }
 
 /** 画面が「このアプリに読ませる」を出してよいか（鍵が置かれているか）を知るため */
@@ -84,6 +106,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const school = ((await schoolRes.json()) as { settings: Record<string, unknown> }[])[0];
     if (!layer) return json({ error: 'カレンダーが見つかりません' }, 404);
 
+    // 月の上限（学校の設定 aiMonthlyYen、既定 1000 円）。使った額は ai_usage の合計
+    const limitYen = Number((school?.settings as { aiMonthlyYen?: number } | undefined)?.aiMonthlyYen ?? DEFAULT_SCHOOL_SETTINGS.aiMonthlyYen);
+    const usedRes = await sb(env, `ai_usage?school_id=eq.${encodeURIComponent(schoolId)}&at=gte.${encodeURIComponent(jstMonthStart())}&select=cost_yen`);
+    if (!usedRes.ok) return json({ error: `使用額を確かめられません: ${await usedRes.text()}` }, 502);
+    const usedYen = ((await usedRes.json()) as { cost_yen: number | string }[]).reduce((a, r) => a + Number(r.cost_yen), 0);
+    if (usedYen >= limitYen) {
+      return json({ error: limitYen <= 0 ? 'この予定表では AI 読み取りを使わない設定です。「自分の AI に読ませて貼り付ける」を使ってください' : `今月の AI 読み取りの上限（${limitYen} 円）に達しました（使用 約 ${Math.round(usedYen)} 円）。管理者が上限を上げるか、「自分の AI に読ませて貼り付ける」を使ってください`, usedYen, limitYen }, 429);
+    }
+    const userId = jwtSub(userJwt);
+    const record = (model: string | undefined, u: { input: number; output: number } | undefined, ok: boolean) =>
+      u ? sb(env, 'ai_usage', { method: 'POST', body: JSON.stringify({ school_id: schoolId, layer_id: calendarId, user_id: userId, model: model ?? null, input_tokens: u.input, output_tokens: u.output, cost_yen: aiCostYen(model ?? '', u.input, u.output), ok }) }).catch(() => undefined) : Promise.resolve(undefined);
+
     // 読み取り
     let events: ScheduleEvent[];
     let model: string;
@@ -91,14 +125,24 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     const fileRef = `upload:${file.name}`;
     // 読み方の設定（何の表か・形・年・場所）は画面から variables で来る。区分は層の班から
     const vars = { categories: layer.slots.join(', '), ...variables };
+    const read = async <T,>(prompt: Prompt<T>) => {
+      try {
+        const r = await readWithClaude<T>(env, prompt, file, vars);
+        await record(r.model, r.usage, true);
+        return r;
+      } catch (e) {
+        if (e instanceof ReadError) await record(e.model, e.usage, false);
+        throw e;
+      }
+    };
     if (kind === 'school-calendar') {
-      const r = await readWithClaude<SchoolCalendarResult>(env, SCHOOL_CALENDAR_PROMPT, file, vars);
+      const r = await read<SchoolCalendarResult>(SCHOOL_CALENDAR_PROMPT);
       const conv = schoolItemsToEvents(r.json, { school: schoolId, layer: calendarId, fileRef, prefixCategories: (layer.source?.prefixCategories as Record<string, string> | undefined) ?? { '南:': '南校舎', '南：': '南校舎' } });
       events = mergeSpans(normalize(conv.events, school?.settings as never));
       model = r.model;
       usage = r.usage;
     } else {
-      const r = await readWithClaude<ClubTableResult>(env, CLUB_TABLE_PROMPT, file, vars);
+      const r = await read<ClubTableResult>(CLUB_TABLE_PROMPT);
       const conv = clubTableToEvents(r.json, { school: schoolId, layer: calendarId, fileRef, settings: school?.settings as never, categoryAliases: layer.source?.categoryAliases as Record<string, string[]> | undefined });
       events = mergeSpans(normalize(conv, school?.settings as never));
       model = r.model;
@@ -116,7 +160,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
     // 設定にない班が出てきたら知らせる（画面で「班を追加」できるように）
     const unknown = [...new Set(events.map((e) => e.category))].filter((c) => !layer.slots.includes(c));
-    return json({ versionId, count: events.length, model, usage, unknownSlots: unknown, costYen: Math.round((usage.input * 2 + usage.output * 10) / 1_000_000 * 150) });
+    return json({ versionId, count: events.length, model, usage, unknownSlots: unknown, costYen: Math.round(aiCostYen(model, usage.input, usage.output)), usedYen: Math.round(usedYen + aiCostYen(model, usage.input, usage.output)), limitYen });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }

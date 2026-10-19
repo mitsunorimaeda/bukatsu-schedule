@@ -11,5 +11,10 @@ out/
 apps/web/public/data/
 apps/web/public/mock/
 .cleanroom/
+
+# 画面の自動確認（Playwright）
+e2e/.state.json
+e2e/.results/
+playwright-report/
 fixtures/
 out_mock/

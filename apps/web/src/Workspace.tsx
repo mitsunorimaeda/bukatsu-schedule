@@ -4,7 +4,7 @@ import { deleteEvent, loadByToken, loadWorkspace, saveEvent, signOut } from './a
 import { CellEditor } from './CellEditor';
 import { MonthTable, type ColumnCal } from './MonthTable';
 import { Tour } from './Tour';
-import { draftCount, fmtMonth, publicEvents, shiftMonth, todayYm, unpublishedChanges, type Calendar, type Change, type UiEvent, type Workspace as Ws } from './model';
+import { draftCount, fmtMonth, publicEvents, shiftMonth, syncAlerts, todayYm, unpublishedChanges, type Calendar, type Change, type UiEvent, type Workspace as Ws } from './model';
 import { CalendarPanel } from './panels/CalendarPanel';
 import { HelpPanel } from './panels/HelpPanel';
 import { ImportPanel } from './panels/ImportPanel';
@@ -165,6 +165,19 @@ export function WorkspaceView({ id, token, email, startTour, onBack }: { id?: st
 
       <div className="layout">
         <aside className="side">
+          {canManage &&
+            syncAlerts(ws.calendars).map((a) => (
+              <div className={`alert ${a.kind}`} key={`alert-${a.cal.id}`} role="alert">
+                <b>{a.kind === 'error' ? '自動更新に失敗' : '自動更新が止まっています'}</b>
+                <div>
+                  {a.cal.name}: {a.message}
+                </div>
+                {a.at && <div className="hint">最終確認 {new Date(a.at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button onClick={() => setPanel({ kind: 'calset', calId: a.cal.id })}>設定を開く</button>
+                </div>
+              </div>
+            ))}
           {pendings.map((c) => (
             <div className="pending" key={c.id}>
               <b>確認待ち</b>

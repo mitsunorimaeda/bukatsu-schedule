@@ -13,9 +13,12 @@
     "import": "tsx packages/importers/src/cli.ts",
     "web:data": "mkdir -p apps/web/public/data && cp out/example/bundle.json apps/web/public/data/example.json",
     "web:dev": "npm run dev -w apps/web",
-    "load": "tsx packages/importers/src/load.ts"
+    "load": "tsx packages/importers/src/load.ts",
+    "e2e": "playwright test",
+    "deploy": "scripts/deploy.sh"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^24.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"

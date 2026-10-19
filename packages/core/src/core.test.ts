@@ -7,6 +7,7 @@ import { diffVersions, renderChangesMarkdown } from './diff.js';
 import { eventUid } from './uid.js';
 import { isNationalHolidayEvent, nationalHolidayName, nationalHolidays } from './holidays.js';
 import { sheetRowsToEvents, guessMapping } from './sheet.js';
+import { aiCostYen, jstMonthStart } from './types.js';
 import type { ScheduleEventInput } from './types.js';
 
 const base = { school: 'example', layer: 'club:track', layerType: 'club' as const, category: '全体' };
@@ -234,4 +235,14 @@ test('シート: 内容の列が複数（班ごとの列）なら列ごとに 1 
 
 test('シート: 見出しの推測で「スケジュール」も内容の候補', () => {
   assert.equal(guessMapping(['日付', '曜', '基本スケジュール']).title, 2);
+});
+
+test('AI の料金の目安と、日本時間の月初', () => {
+  // Sonnet 5.5: 入力 2 ドル・出力 10 ドル / 100 万トークン、1 ドル 150 円
+  assert.equal(aiCostYen('claude-sonnet-5-5', 1_000_000, 0), 300);
+  assert.equal(aiCostYen('claude-sonnet-5-5', 20_000, 10_000), 21);
+  assert.equal(aiCostYen('claude-haiku-4-5-20251001', 1_000_000, 1_000_000), 900);
+  // 日本時間 11/1 00:30 はもう 11 月（UTC では 10/31 15:30）
+  assert.equal(jstMonthStart(new Date('2026-10-31T15:30:00Z')), '2026-10-31T15:00:00.000Z');
+  assert.equal(jstMonthStart(new Date('2026-10-31T14:59:00Z')), '2026-09-30T15:00:00.000Z');
 });
